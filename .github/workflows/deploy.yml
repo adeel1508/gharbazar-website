@@ -78,8 +78,10 @@ jobs:
           if [ "$code" != "200" ]; then echo "FAIL: live site returned $code"; exit 1; fi
 
   deploy:
-    # Only on push, and only if the test job passed.
-    if: github.event_name == 'push'
+    # On push, and on manual dispatch — only if the test job passed.
+    # (Manual dispatch must be able to deploy too, otherwise a fresh
+    # dispatch can never publish the site.)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
     environment:
