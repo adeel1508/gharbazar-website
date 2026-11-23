@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmation - GharBazar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="nav-container">
+      <a href="index.html" class="brand-logo">
+        <div class="brand-icon">GB</div>
+        <div>
+          <div class="brand-title">GharBazar</div>
+          <div class="brand-subtitle">Pakistan Boutique</div>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main style="display: flex; align-items: center; justify-content: center; min-height: 80vh;">
+    <div class="confirmation-card">
+      <div class="success-icon-wrap">✓</div>
+      <h1 style="font-size: 1.8rem; font-weight: 800; color: var(--on-background);">Order Placed Successfully!</h1>
+      <p style="color: var(--on-surface-variant); margin-top: 6px;">Thank you for shopping with GharBazar. Your order is confirmed via Cash on Delivery (COD).</p>
+
+      <div class="order-number-badge" id="order-number-display">
+        GB-------
+      </div>
+
+      <div style="text-align: left; background: var(--surface-low); padding: 16px; border-radius: var(--radius-sm); margin-bottom: 24px; font-size: 0.9rem;">
+        <div style="margin-bottom: 8px;"><strong>Customer Name:</strong> <span id="conf-name">-</span></div>
+        <div style="margin-bottom: 8px;"><strong>Phone Number:</strong> <span id="conf-phone">-</span></div>
+        <div style="margin-bottom: 8px;"><strong>Delivery Address:</strong> <span id="conf-address">-</span></div>
+        <div style="margin-bottom: 8px;"><strong>City:</strong> <span id="conf-city">-</span></div>
+        <div style="margin-bottom: 4px;"><strong>Total Amount (COD):</strong> <span id="conf-total" style="color: var(--primary); font-weight: 700;">-</span></div>
+      </div>
+
+      <a href="index.html" class="btn-primary" style="display: inline-block; padding: 14px 28px; font-size: 1rem;">
+        Continue Shopping
+      </a>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 GharBazar E-Commerce • Cash on Delivery Across Pakistan • Live Cloud Sync</p>
+  </footer>
+
+  <!-- App Script -->
+  <script type="module">
+    import { formatPkr } from './js/app.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        const rawOrder = localStorage.getItem('gharbazar_last_order');
+        if (!rawOrder) {
+          window.location.href = 'index.html';
+          return;
+        }
+
+        const order = JSON.parse(rawOrder);
+        document.getElementById('order-number-display').textContent = order.orderNumber;
+        document.getElementById('conf-name').textContent = order.customerName;
+        document.getElementById('conf-phone').textContent = order.phoneNumber;
+        document.getElementById('conf-address').textContent = order.deliveryAddress;
+        document.getElementById('conf-city').textContent = order.city;
+        document.getElementById('conf-total').textContent = formatPkr(order.totalPkr);
+      } catch (e) {
+        console.warn("Error loading confirmation order:", e);
+        window.location.href = 'index.html';
+      }
+    });
+  </script>
+</body>
+</html>

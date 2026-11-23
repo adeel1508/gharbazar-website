@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GharBazar - Premium Winter Blankets & Men's Suits</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="nav-container">
+      <a href="index.html" class="brand-logo">
+        <div class="brand-icon">GB</div>
+        <div>
+          <div class="brand-title">GharBazar</div>
+          <div class="brand-subtitle">Pakistan Boutique</div>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <button class="cart-btn" id="open-cart-btn">
+          <span>🛒 Cart</span>
+          <span class="cart-badge" id="cart-badge" style="display: none;">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <!-- Sync Status Banner -->
+    <div class="sync-banner" id="sync-banner">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-text">Connecting to Cloud Firestore...</span>
+    </div>
+
+    <!-- Store Controls (Search, Categories, Sort) -->
+    <div class="store-controls">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" class="search-input" placeholder="Search blankets or men's suits...">
+      </div>
+      <div class="filter-sort-group">
+        <div class="category-filters" id="category-filters">
+          <button class="filter-btn active" data-category="ALL">All Products</button>
+          <button class="filter-btn" data-category="BLANKETS">Blankets</button>
+          <button class="filter-btn" data-category="MENS_SUITS">Men's Suits</button>
+        </div>
+        <select class="sort-select" id="sort-select">
+          <option value="FEATURED">Sort: Featured</option>
+          <option value="PRICE_LOW_HIGH">Price: Low to High</option>
+          <option value="PRICE_HIGH_LOW">Price: High to Low</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Product Grid -->
+    <div class="product-grid" id="product-grid">
+      <!-- Products will be dynamically rendered here -->
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 GharBazar E-Commerce • Cash on Delivery Across Pakistan • Live Cloud Sync</p>
+  </footer>
+
+  <!-- App Script -->
+  <script type="module">
+    import { subscribeProducts, formatPkr, getImageSrc, addToCart, updateCartBadge, setupCartDrawer, toggleCartModal } from './js/app.js';
+
+    let allProducts = [];
+    let currentCategory = 'ALL';
+    let searchQuery = '';
+    let sortOption = 'FEATURED';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateCartBadge();
+      setupCartDrawer();
+
+      document.getElementById('open-cart-btn').addEventListener('click', toggleCartModal);
+
+      // Search listener
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        searchQuery = e.target.value.toLowerCase().trim();
+        renderProducts();
+      });
+
+      // Category filters
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          currentCategory = e.target.getAttribute('data-category');
+          renderProducts();
+        });
+      });
+
+      // Sort select
+      document.getElementById('sort-select').addEventListener('change', (e) => {
+        sortOption = e.target.value;
+        renderProducts();
+      });
+
+      // Subscribe to live Firebase products
+      subscribeProducts((products, isLive, message) => {
+        allProducts = products;
+        const banner = document.getElementById('sync-banner');
+        const dot = document.getElementById('sync-dot');
+        const text = document.getElementById('sync-text');
+
+        text.textContent = message;
+        if (isLive) {
+          dot.classList.add('live');
+        } else {
+          dot.classList.remove('live');
+        }
+
+        renderProducts();
+      });
+    });
+
+    function renderProducts() {
+      const grid = document.getElementById('product-grid');
+      
+      let filtered = allProducts.filter(p => {
+        const matchesCategory = currentCategory === 'ALL' || p.category === currentCategory || (currentCategory === 'BLANKETS' && p.category.toLowerCase().includes('blanket')) || (currentCategory === 'MENS_SUITS' && (p.category.toLowerCase().includes('suit') || p.category.toLowerCase().includes('men')));
+        const matchesSearch = !searchQuery || p.name.toLowerCase().includes(searchQuery) || (p.fabric && p.fabric.toLowerCase().includes(searchQuery));
+        return matchesCategory && matchesSearch;
+      });
+
+      if (sortOption === 'PRICE_LOW_HIGH') {
+        filtered.sort((a, b) => a.pricePkr - b.pricePkr);
+      } else if (sortOption === 'PRICE_HIGH_LOW') {
+        filtered.sort((a, b) => b.pricePkr - a.pricePkr);
+      }
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <h3>No products found</h3>
+            <p>Try adjusting your search or category filter.</p>
+            <button class="btn-primary" onclick="window.location.reload()">Reset Filters</button>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(p => `
+        <div class="product-card">
+          <div class="product-img-wrap">
+            <span class="category-tag">${p.category === 'MENS_SUITS' ? "Men's Suit" : "Blanket"}</span>
+            <img src="${getImageSrc(p)}" alt="${p.name}" class="product-img" loading="lazy">
+          </div>
+          <div class="product-info">
+            <h3 class="product-name">
+              <a href="product.html?id=${p.id}">${p.name}</a>
+            </h3>
+            <div class="product-spec-short">${p.shortSpec || p.size || p.fabric}</div>
+            <div class="product-footer">
+              <span class="product-price">${formatPkr(p.pricePkr)}</span>
+              <div style="display: flex; gap: 8px;">
+                <a href="product.html?id=${p.id}" class="btn-secondary">Details</a>
+                <button class="btn-primary" onclick="window.gbAddAndNotify('${p.id}')">Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.gbAddAndNotify = (productId) => {
+      const product = allProducts.find(p => p.id === productId);
+      if (product) {
+        addToCart(product, 1);
+        toggleCartModal();
+      }
+    };
+  </script>
+</body>
+</html>

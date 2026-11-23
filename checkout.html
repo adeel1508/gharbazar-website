@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout (Cash on Delivery) - GharBazar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="nav-container">
+      <a href="index.html" class="brand-logo">
+        <div class="brand-icon">GB</div>
+        <div>
+          <div class="brand-title">GharBazar</div>
+          <div class="brand-subtitle">Pakistan Boutique</div>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <a href="index.html" class="btn-secondary" style="font-size: 0.9rem;">← Continue Shopping</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="checkout-container">
+      <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 4px;">Checkout</h1>
+      <p style="color: var(--on-surface-variant); margin-bottom: 20px;">Complete your delivery details for Cash on Delivery.</p>
+
+      <!-- COD Notice Card -->
+      <div class="notice-card">
+        <span style="font-size: 1.2rem;">📦</span>
+        <div>
+          <strong>Cash on Delivery (COD) Only</strong>
+          <p style="margin-top: 2px; font-size: 0.85rem; opacity: 0.9;">Pay securely with cash when your order arrives at your doorstep anywhere in Pakistan.</p>
+        </div>
+      </div>
+
+      <!-- Checkout Form Card -->
+      <div class="card">
+        <div class="card-title">Delivery Details</div>
+        <form id="checkout-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="customer-name">Full Name *</label>
+            <input type="text" id="customer-name" class="form-input" placeholder="e.g. Muhammad Ali">
+            <div class="error-text" id="error-name" style="display: none;">Please enter your full name.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="phone-number">Phone Number *</label>
+            <input type="tel" id="phone-number" class="form-input" placeholder="e.g. 03001234567">
+            <div class="error-text" id="error-phone" style="display: none;">Please enter a valid phone number (at least 7 digits).</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="delivery-address">Complete Delivery Address *</label>
+            <textarea id="delivery-address" class="form-textarea" rows="3" placeholder="House number, street, area, landmark..."></textarea>
+            <div class="error-text" id="error-address" style="display: none;">Please enter your complete delivery address.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="city">City *</label>
+            <input type="text" id="city" class="form-input" placeholder="e.g. Lahore">
+            <div class="error-text" id="error-city" style="display: none;">Please enter your delivery city.</div>
+            <div class="city-chips" id="city-chips-container">
+              <!-- Quick city chips inserted here -->
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Order Summary Card -->
+      <div class="card">
+        <div class="card-title">Order Summary</div>
+        <div id="checkout-items-list" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+          <!-- Cart items summarized here -->
+        </div>
+        <div style="border-top: 1px solid var(--outline-variant); padding-top: 12px; display: flex; justify-content: space-between; font-size: 1.2rem; font-weight: 700;">
+          <span>Total Amount:</span>
+          <span id="checkout-total-price" style="color: var(--primary);">Rs 0</span>
+        </div>
+      </div>
+
+      <!-- Place Order Button -->
+      <button class="btn-primary" id="place-order-btn" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; margin-bottom: 40px;">
+        Confirm & Place Order (COD)
+      </button>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 GharBazar E-Commerce • Cash on Delivery Across Pakistan • Live Cloud Sync</p>
+  </footer>
+
+  <!-- App Script -->
+  <script type="module">
+    import { getCart, getCartTotalPkr, formatPkr, getImageSrc, POPULAR_CITIES, placeOrder } from './js/app.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const cart = getCart();
+      if (cart.length === 0) {
+        alert("Your cart is empty. Redirecting to shop.");
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Render summary items
+      const itemsList = document.getElementById('checkout-items-list');
+      itemsList.innerHTML = cart.map(item => `
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="${getImageSrc(item.product)}" alt="${item.product.name}" style="width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: var(--surface-container);">
+            <div>
+              <div style="font-size: 0.9rem; font-weight: 600; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.product.name}</div>
+              <div style="font-size: 0.8rem; color: var(--on-surface-variant);">Qty: ${item.quantity} × ${formatPkr(item.product.pricePkr)}</div>
+            </div>
+          </div>
+          <div style="font-size: 0.95rem; font-weight: 700; color: var(--primary);">${formatPkr(item.product.pricePkr * item.quantity)}</div>
+        </div>
+      `).join('');
+
+      document.getElementById('checkout-total-price').textContent = formatPkr(getCartTotalPkr());
+
+      // Render popular city chips
+      const chipsContainer = document.getElementById('city-chips-container');
+      chipsContainer.innerHTML = POPULAR_CITIES.map(c => `
+        <button type="button" class="city-chip" data-city="${c}">${c}</button>
+      `).join('');
+
+      chipsContainer.querySelectorAll('.city-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('city').value = btn.getAttribute('data-city');
+          document.getElementById('error-city').style.display = 'none';
+          document.getElementById('city').classList.remove('error');
+        });
+      });
+
+      // Place order button
+      document.getElementById('place-order-btn').addEventListener('click', () => {
+        const nameInput = document.getElementById('customer-name');
+        const phoneInput = document.getElementById('phone-number');
+        const addressInput = document.getElementById('delivery-address');
+        const cityInput = document.getElementById('city');
+
+        const nameVal = nameInput.value.trim();
+        const phoneVal = phoneInput.value.trim();
+        const addressVal = addressInput.value.trim();
+        const cityVal = cityInput.value.trim();
+
+        let hasError = false;
+
+        const errorName = document.getElementById('error-name');
+        if (!nameVal) {
+          errorName.style.display = 'block';
+          nameInput.classList.add('error');
+          hasError = true;
+        } else {
+          errorName.style.display = 'none';
+          nameInput.classList.remove('error');
+        }
+
+        const digitCount = (phoneVal.match(/\d/g) || []).length;
+        const errorPhone = document.getElementById('error-phone');
+        if (!phoneVal || digitCount < 7) {
+          errorPhone.style.display = 'block';
+          phoneInput.classList.add('error');
+          hasError = true;
+        } else {
+          errorPhone.style.display = 'none';
+          phoneInput.classList.remove('error');
+        }
+
+        const errorAddress = document.getElementById('error-address');
+        if (!addressVal) {
+          errorAddress.style.display = 'block';
+          addressInput.classList.add('error');
+          hasError = true;
+        } else {
+          errorAddress.style.display = 'none';
+          addressInput.classList.remove('error');
+        }
+
+        const errorCity = document.getElementById('error-city');
+        if (!cityVal) {
+          errorCity.style.display = 'block';
+          cityInput.classList.add('error');
+          hasError = true;
+        } else {
+          errorCity.style.display = 'none';
+          cityInput.classList.remove('error');
+        }
+
+        if (hasError) return;
+
+        // Disable button to prevent double submit
+        const placeBtn = document.getElementById('place-order-btn');
+        placeBtn.disabled = true;
+        placeBtn.textContent = "Placing Order...";
+
+        placeOrder({
+          customerName: nameVal,
+          phoneNumber: phoneVal,
+          deliveryAddress: addressVal,
+          city: cityVal
+        }, (orderNumber) => {
+          window.location.href = 'confirmation.html';
+        });
+      });
+    });
+  </script>
+</body>
+</html>
