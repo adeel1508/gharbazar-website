@@ -1,0 +1,99 @@
+name: Deploy GharBazar to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Daily live-site check (~08:00 PKT)
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Serve site locally
+        run: |
+          python3 -m http.server 8000 --directory . >/tmp/http.log 2>&1 &
+          sleep 2
+
+      - name: Verify every HTML page returns 200
+        run: |
+          for page in index.html product.html checkout.html confirmation.html; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8000/$page")
+            echo "$page -> $code"
+            if [ "$code" != "200" ]; then echo "FAIL: $page returned $code"; exit 1; fi
+          done
+
+      - name: Verify every local CSS/JS/image file referenced exists
+        run: |
+          fail=0
+          for ref in $(grep -rhoE '(src|href)="[^"]+"' --include='*.html' . \
+              | sed -E 's/^(src|href)="([^"]+)"/\2/' \
+              | grep -vE '^(https?:)?//' | grep -vE '^#' | grep -vE '^$' | sort -u); do
+            path="${ref%%\?*}"
+            path="${path%%\#*}"
+            if [ ! -f "$path" ]; then echo "MISSING: $path (referenced in HTML)"; fail=1; fi
+          done
+          # Also check every file referenced from JS/CSS exists
+          for ref in $(grep -rhoE 'images/[^"'\'' )]+' --include='*.html' --include='*.js' --include='*.css' . | sort -u); do
+            if [ ! -f "$ref" ]; then echo "MISSING: $ref"; fail=1; fi
+          done
+          [ "$fail" = "0" ] || exit 1
+          echo "All referenced local files exist."
+
+      - name: Verify the 8 product prices are present
+        run: |
+          for price in 1949 1949 2599 3599 1999 2299 2999 3099; do
+            grep -q "pricePkr: $price" js/app.js || { echo "FAIL: price $price missing from js/app.js"; exit 1; }
+          done
+          count=$(grep -c 'pricePkr:' js/app.js)
+          echo "Found $count pricePkr entries (8 products + fallbacks)."
+          echo "All 8 product prices present."
+
+  live-check:
+    # Runs only on the daily schedule: curl the live site, fail if not 200.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check live site returns 200
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' https://adeel1508.github.io/gharbazar-website/)
+          echo "Live site -> $code"
+          if [ "$code" != "200" ]; then echo "FAIL: live site returned $code"; exit 1; fi
+
+  deploy:
+    # Only on push, and only if the test job passed.
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
