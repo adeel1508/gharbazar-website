@@ -42,13 +42,16 @@ jobs:
           fail=0
           for ref in $(grep -rhoE '(src|href)="[^"]+"' --include='*.html' . \
               | sed -E 's/^(src|href)="([^"]+)"/\2/' \
-              | grep -vE '^(https?:)?//' | grep -vE '^#' | grep -vE '^$' | sort -u); do
+              | grep -vE '^(https?:)?//' | grep -vE '^#' | grep -vE '^$' \
+              | grep -vF '${' | sort -u); do
+            # NOTE: refs containing ${...} are JS template expressions resolved
+            # at runtime (e.g. src="${getImageSrc(p)}"), not literal files.
             path="${ref%%\?*}"
             path="${path%%\#*}"
             if [ ! -f "$path" ]; then echo "MISSING: $path (referenced in HTML)"; fail=1; fi
           done
           # Also check every file referenced from JS/CSS exists
-          for ref in $(grep -rhoE 'images/[^"'\'' )]+' --include='*.html' --include='*.js' --include='*.css' . | sort -u); do
+          for ref in $(grep -rhoE 'images/[^"'\'' )]+' --include='*.html' --include='*.js' --include='*.css' . | grep -vF '${' | sort -u); do
             if [ ! -f "$ref" ]; then echo "MISSING: $ref"; fail=1; fi
           done
           [ "$fail" = "0" ] || exit 1
