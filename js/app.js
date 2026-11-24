@@ -1,7 +1,8 @@
-/* GharBazar Main Application Script with Live Firebase Firestore Integration */
+/* GharBazar Main Application Script with Live Firebase Firestore & Auth Integration */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, onSnapshot, addDoc, setDoc, doc, getDoc, getDocs, deleteDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDhACx9RMzpI34qaXm7T_TfDos-crWycZA",
@@ -11,7 +12,6 @@ const firebaseConfig = {
   messagingSenderId: "374383787334"
 };
 
-// Built-in 8 products fallback catalogue
 const BUILT_IN_PRODUCTS = [
   {
     id: "blanket_cozy_fleece_black",
@@ -176,15 +176,205 @@ export const POPULAR_CITIES = [
   "Lahore", "Karachi", "Islamabad", "Rawalpindi", "Faisalabad", "Multan", "Peshawar", "Sialkot"
 ];
 
-// Initialize Firebase
 let db = null;
+let auth = null;
 let isCloudLive = false;
 
 try {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
+  auth = getAuth(app);
 } catch (e) {
   console.warn("Firebase initialization warning:", e);
+}
+
+export function onAuth(callback) {
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  return onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      await loadCloudCartOnLogin(user.uid);
+    }
+    callback(user);
+  });
+}
+
+export async function logInWithEmail(email, password) {
+  if (!auth) throw new Error("Auth not initialized");
+  return await signInWithEmailAndPassword(auth, email, password);
+}
+
+export async function signUpWithEmail(email, password, name, phone) {
+  if (!auth) throw new Error("Auth not initialized");
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  const user = cred.user;
+  if (db) {
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        displayName: name,
+        phone: phone,
+        email: email,
+        addresses: [],
+        createdAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
+      console.warn("Failed to create user profile doc:", e);
+    }
+  }
+  return cred;
+}
+
+export async function logInWithGoogle() {
+  if (!auth) throw new Error("Auth not initialized");
+  const provider = new GoogleAuthProvider();
+  const cred = await signInWithPopup(auth, provider);
+  const user = cred.user;
+  if (db) {
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          displayName: user.displayName || "Customer",
+          phone: user.phoneNumber || "",
+          email: user.email,
+          addresses: [],
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to ensure Google user profile:", e);
+    }
+  }
+  return cred;
+}
+
+export async function logOut() {
+  if (!auth) return;
+  return await signOut(auth);
+}
+
+export function formatAuthError(err) {
+  const code = err.code || "";
+  const msg = err.message || "";
+  if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+    return "Invalid email or password. Please check your credentials and try again.";
+  }
+  if (code === 'auth/email-already-in-use') {
+    return "An account with this email address already exists. Please log in instead.";
+  }
+  if (code === 'auth/weak-password') {
+    return "Password is too weak. Please use at least 6 characters.";
+  }
+  if (code === 'auth/invalid-email') {
+    return "Please enter a valid email address.";
+  }
+  if (code === 'auth/popup-closed-by-user') {
+    return "Google sign-in was cancelled.";
+  }
+  return msg || "An authentication error occurred. Please try again.";
+}
+
+export async function getUserProfile(uid) {
+  if (!db) return null;
+  try {
+    const docRef = doc(db, "users", uid);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+    return null;
+  } catch (e) {
+    console.warn("Failed to get user profile:", e);
+    return null;
+  }
+}
+
+export async function updateUserProfile(uid, data) {
+  if (!db) return;
+  try {
+    const docRef = doc(db, "users", uid);
+    await setDoc(docRef, data, { merge: true });
+  } catch (e) {
+    console.warn("Failed to update user profile:", e);
+    throw e;
+  }
+}
+
+export async function getUserOrders(uid) {
+  if (!db) return [];
+  try {
+    const q = query(collection(db, "orders"), where("userId", "==", uid));
+    const snap = await getDocs(q);
+    const orders = [];
+    snap.forEach(d => {
+      orders.push({ id: d.id, ...d.data() });
+    });
+    orders.sort((a, b) => {
+      const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.timestamp ? new Date(a.timestamp).getTime() : 0);
+      const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.timestamp ? new Date(b.timestamp).getTime() : 0);
+      return timeB - timeA;
+    });
+    return orders;
+  } catch (e) {
+    console.warn("Failed to get user orders:", e);
+    return [];
+  }
+}
+
+export function setupHeaderAuth() {
+  const navActions = document.querySelector('.nav-actions');
+  if (!navActions) return;
+
+  let authContainer = document.getElementById('header-auth-container');
+  if (!authContainer) {
+    authContainer = document.createElement('div');
+    authContainer.id = 'header-auth-container';
+    authContainer.style.display = 'inline-flex';
+    authContainer.style.alignItems = 'center';
+    authContainer.style.gap = '8px';
+    const cartBtn = navActions.querySelector('#open-cart-btn');
+    if (cartBtn) {
+      navActions.insertBefore(authContainer, cartBtn);
+    } else {
+      navActions.appendChild(authContainer);
+    }
+  }
+
+  onAuth(async (user) => {
+    if (!user) {
+      authContainer.innerHTML = `
+        <a href="auth.html" class="btn-secondary" style="font-size: 0.9rem; text-decoration: none;">Log In</a>
+      `;
+    } else {
+      let displayName = user.displayName || user.email;
+      try {
+        const profile = await getUserProfile(user.uid);
+        if (profile && profile.displayName) {
+          displayName = profile.displayName;
+        }
+      } catch (e) {}
+
+      authContainer.innerHTML = `
+        <a href="account.html" class="btn-secondary" style="font-size: 0.9rem; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+          <span>👤</span> <span>${displayName}</span>
+        </a>
+        <button id="header-logout-btn" class="btn-secondary" style="font-size: 0.85rem; padding: 6px 10px; color: var(--error); border-color: var(--error);">Log Out</button>
+      `;
+
+      const logoutBtn = document.getElementById('header-logout-btn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+          await logOut();
+          window.location.reload();
+        });
+      }
+    }
+  });
 }
 
 export function formatPkr(amount) {
@@ -206,7 +396,6 @@ export function getImageSrc(product) {
   return map[product.imageKey] || 'images/img_blanket_plain_blue_1795368928571.jpg';
 }
 
-// Cart Storage helper
 export function getCart() {
   try {
     return JSON.parse(localStorage.getItem('gharbazar_cart')) || [];
@@ -215,9 +404,45 @@ export function getCart() {
   }
 }
 
+export async function loadCloudCartOnLogin(uid) {
+  if (!db) return;
+  try {
+    const cartRef = doc(db, "carts", uid);
+    const cartSnap = await getDoc(cartRef);
+    const localCart = getCart();
+
+    if (cartSnap.exists()) {
+      const cloudItems = cartSnap.data().items || [];
+      const mergedMap = new Map();
+      cloudItems.forEach(item => mergedMap.set(item.product.id, { ...item }));
+      localCart.forEach(item => {
+        if (mergedMap.has(item.product.id)) {
+          mergedMap.get(item.product.id).quantity += item.quantity;
+        } else {
+          mergedMap.set(item.product.id, { ...item });
+        }
+      });
+      const mergedCart = Array.from(mergedMap.values());
+      localStorage.setItem('gharbazar_cart', JSON.stringify(mergedCart));
+      await setDoc(cartRef, { items: mergedCart, updatedAt: serverTimestamp() }, { merge: true });
+      updateCartBadge();
+    } else if (localCart.length > 0) {
+      await setDoc(cartRef, { items: localCart, updatedAt: serverTimestamp() });
+    }
+  } catch (e) {
+    console.warn("Failed to load cloud cart on login:", e);
+  }
+}
+
 export function saveCart(cart) {
   localStorage.setItem('gharbazar_cart', JSON.stringify(cart));
   updateCartBadge();
+  if (db && auth && auth.currentUser) {
+    const uid = auth.currentUser.uid;
+    setDoc(doc(db, "carts", uid), { items: cart, updatedAt: serverTimestamp() }, { merge: true }).catch(e => {
+      console.warn("Failed to sync cart to cloud:", e);
+    });
+  }
 }
 
 export function addToCart(product, quantity = 1) {
@@ -266,7 +491,6 @@ export function updateCartBadge() {
   }
 }
 
-// Fetch or listen to products from Firestore
 export function subscribeProducts(onProductsLoaded) {
   if (!db) {
     onProductsLoaded(BUILT_IN_PRODUCTS, false, "Firestore unconfigured. Using built-in 8-product catalogue.");
@@ -311,9 +535,10 @@ export function subscribeProducts(onProductsLoaded) {
   }
 }
 
-// Place Order (writes to Firestore 'orders' collection and saves to localStorage)
 export async function placeOrder(orderData, callback) {
   const orderNumber = "GB-" + Math.floor(100000 + Math.random() * 900000);
+  const uid = auth && auth.currentUser ? auth.currentUser.uid : null;
+
   const fullOrder = {
     orderNumber,
     customerName: orderData.customerName,
@@ -322,24 +547,34 @@ export async function placeOrder(orderData, callback) {
     city: orderData.city,
     items: getCart(),
     totalPkr: getCartTotalPkr(),
-    timestamp: serverTimestamp ? serverTimestamp() : new Date().toISOString()
+    userId: uid,
+    status: "placed",
+    createdAt: serverTimestamp ? serverTimestamp() : new Date(),
+    timestamp: new Date().toISOString()
   };
 
-  // Save to localStorage for confirmation page
   localStorage.setItem('gharbazar_last_order', JSON.stringify({
     ...fullOrder,
+    createdAt: new Date().toISOString(),
     timestamp: new Date().toISOString()
   }));
 
-  // Clear cart
   localStorage.removeItem('gharbazar_cart');
   updateCartBadge();
+
+  if (uid && db) {
+    try {
+      await setDoc(doc(db, "carts", uid), { items: [], updatedAt: serverTimestamp() });
+    } catch (e) {
+      console.warn("Failed to clear cloud cart:", e);
+    }
+  }
 
   if (db) {
     try {
       await addDoc(collection(db, "orders"), {
         ...fullOrder,
-        timestamp: new Date()
+        createdAt: serverTimestamp()
       });
       console.log("Order successfully written to Firestore 'orders'");
     } catch (e) {
@@ -350,7 +585,104 @@ export async function placeOrder(orderData, callback) {
   if (callback) callback(orderNumber);
 }
 
-// Render Cart Drawer HTML
+export async function adminGetProducts() {
+  if (!db) return BUILT_IN_PRODUCTS;
+  try {
+    const snap = await getDocs(collection(db, "products"));
+    if (snap.empty) return BUILT_IN_PRODUCTS;
+    const products = [];
+    snap.forEach(d => {
+      const data = d.data();
+      products.push({
+        id: d.id,
+        name: data.name || "Product",
+        pricePkr: Number(data.pricePkr) || 1999,
+        category: data.category || "BLANKETS",
+        fabric: data.fabric || "Standard",
+        size: data.size || "Standard",
+        shortSpec: data.shortSpec || "",
+        specs: data.specs || [],
+        description: data.description || "",
+        imageKey: data.imageKey || "blanket_plain_blue",
+        imageUri: data.imageUri || null,
+        inStock: data.inStock !== false,
+        stockQuantity: Number(data.stockQuantity) || 20
+      });
+    });
+    return products;
+  } catch (e) {
+    console.warn("Failed to admin get products:", e);
+    return BUILT_IN_PRODUCTS;
+  }
+}
+
+export async function adminSaveProduct(product) {
+  if (!db) throw new Error("Firestore unconfigured");
+  const prodId = product.id || ("prod_" + Date.now());
+  const prodData = {
+    name: product.name,
+    pricePkr: Number(product.pricePkr),
+    category: product.category,
+    fabric: product.fabric || "",
+    size: product.size || "",
+    shortSpec: product.shortSpec || "",
+    specs: product.specs || [],
+    description: product.description || "",
+    imageKey: product.imageKey || "blanket_plain_blue",
+    imageUri: product.imageUri || null,
+    inStock: product.inStock !== false,
+    stockQuantity: Number(product.stockQuantity) || 20,
+    updatedAt: serverTimestamp()
+  };
+  await setDoc(doc(db, "products", prodId), prodData, { merge: true });
+  return prodId;
+}
+
+export async function adminDeleteProduct(id) {
+  if (!db) throw new Error("Firestore unconfigured");
+  await deleteDoc(doc(db, "products", id));
+}
+
+export async function adminGetAllOrders() {
+  if (!db) return [];
+  try {
+    const snap = await getDocs(collection(db, "orders"));
+    const orders = [];
+    snap.forEach(d => {
+      orders.push({ id: d.id, ...d.data() });
+    });
+    orders.sort((a, b) => {
+      const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.timestamp ? new Date(a.timestamp).getTime() : 0);
+      const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.timestamp ? new Date(b.timestamp).getTime() : 0);
+      return timeB - timeA;
+    });
+    return orders;
+  } catch (e) {
+    console.warn("Failed to admin get orders:", e);
+    return [];
+  }
+}
+
+export async function adminUpdateOrderStatus(orderId, status) {
+  if (!db) throw new Error("Firestore unconfigured");
+  await setDoc(doc(db, "orders", orderId), { status, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function seedProductsToFirestore() {
+  if (!db) throw new Error("Firestore unconfigured");
+  const snap = await getDocs(collection(db, "products"));
+  if (!snap.empty) {
+    throw new Error("Products collection is not empty. Seeding skipped.");
+  }
+  for (const p of BUILT_IN_PRODUCTS) {
+    const { id, ...data } = p;
+    await setDoc(doc(db, "products", id), {
+      ...data,
+      createdAt: serverTimestamp()
+    });
+  }
+}
+
 export function setupCartDrawer() {
   const existingModal = document.getElementById('cart-modal');
   if (existingModal) return;
@@ -440,7 +772,6 @@ export function renderCartDrawerContent() {
   `).join('');
 }
 
-// Global window actions for inline event handlers
 window.gbIncreaseQty = (id) => {
   updateCartQty(id, 1);
   renderCartDrawerContent();
