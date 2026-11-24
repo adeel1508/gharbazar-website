@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - GharBazar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header style="background: #221A16; color: white; border-bottom: 1px solid #43342D;">
+    <div class="nav-container">
+      <div class="brand-logo">
+        <div class="brand-icon" style="background: var(--primary);">GB</div>
+        <div>
+          <div class="brand-title" style="color: white;">GharBazar Admin</div>
+          <div class="brand-subtitle" style="color: #D3C4B6;">Management Console</div>
+        </div>
+      </div>
+      <div class="nav-actions" id="admin-header-actions" style="display: none;">
+        <span id="admin-user-email" style="font-size: 0.9rem; font-weight: 600; color: #E7DDD2;"></span>
+        <button id="admin-logout-btn" class="btn-secondary" style="background: #3B2E28; color: white; border-color: #5B4D44;">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main style="max-width: 1300px;">
+
+    <!-- Login View (shown if logged out or non-admin) -->
+    <div id="admin-auth-container" style="display: none; max-width: 440px; margin: 60px auto;">
+      <div class="card">
+        <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 6px;">Admin Login</h2>
+        <p style="color: var(--on-surface-variant); font-size: 0.9rem; margin-bottom: 20px;">Restricted access. Authorized administrator only.</p>
+        
+        <div id="admin-login-alert" style="display: none; padding: 12px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 0.9rem; font-weight: 500;"></div>
+
+        <form id="admin-login-form">
+          <div class="form-group">
+            <label class="form-label" for="admin-email">Admin Email *</label>
+            <input type="email" id="admin-email" class="form-input" placeholder="adeel.arif0786@gmail.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-password">Password *</label>
+            <input type="password" id="admin-password" class="form-input" placeholder="Enter admin password" required>
+          </div>
+          <button type="submit" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1rem;">Login to Admin Panel</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Non-Admin Refusal View -->
+    <div id="admin-refusal-container" style="display: none; max-width: 500px; margin: 80px auto; text-align: center;">
+      <div class="card" style="padding: 40px;">
+        <div style="font-size: 3rem; margin-bottom: 12px;">🚫</div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--error); margin-bottom: 8px;">Access Denied</h2>
+        <p style="color: var(--on-surface-variant); margin-bottom: 20px; font-size: 0.95rem;">
+          You are signed in as <strong id="refused-email"></strong>, which is not authorized as the web administrator (<code style="background: var(--surface-low); padding: 2px 6px; border-radius: 4px;">adeel.arif0786@gmail.com</code>).
+        </p>
+        <button id="refusal-logout-btn" class="btn-primary" style="padding: 10px 24px;">Sign Out & Switch Account</button>
+      </div>
+    </div>
+
+    <!-- Admin Dashboard View -->
+    <div id="admin-dashboard-container" style="display: none;">
+      
+      <!-- Dashboard Tabs -->
+      <div style="display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--outline-variant); padding-bottom: 12px;">
+        <button id="tab-products-btn" class="btn-primary" style="padding: 10px 20px;">Manage Products</button>
+        <button id="tab-orders-btn" class="btn-secondary" style="padding: 10px 20px;">Manage Orders</button>
+        <button id="seed-btn" class="btn-secondary" style="margin-left: auto; background: var(--success-container); color: var(--success); border-color: var(--success);">Seed Default 8 Products</button>
+      </div>
+
+      <!-- Products Section -->
+      <div id="section-products">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="font-size: 1.4rem; font-weight: 800;">Product Catalogue (<span id="admin-prod-count">0</span>)</h2>
+          <button id="btn-new-product" class="btn-primary">+ Add New Product</button>
+        </div>
+
+        <!-- Product Edit Form Modal / Card -->
+        <div id="product-form-card" class="card" style="display: none; margin-bottom: 24px; border: 2px solid var(--primary);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 id="product-form-title" style="font-size: 1.2rem; font-weight: 700;">Add / Edit Product</h3>
+            <button type="button" class="close-btn" id="close-prod-form">&times;</button>
+          </div>
+          <form id="product-edit-form">
+            <input type="hidden" id="edit-prod-id">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="form-group">
+                <label class="form-label">Product Name *</label>
+                <input type="text" id="edit-name" class="form-input" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Price (PKR) *</label>
+                <input type="number" id="edit-price" class="form-input" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Category *</label>
+                <select id="edit-category" class="form-input">
+                  <option value="BLANKETS">BLANKETS</option>
+                  <option value="MENS_SUITS">MENS_SUITS</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Stock Quantity *</label>
+                <input type="number" id="edit-stock" class="form-input" value="20" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Fabric / Material</label>
+                <input type="text" id="edit-fabric" class="form-input" placeholder="e.g. Fleece">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Size / Cutting</label>
+                <input type="text" id="edit-size" class="form-input" placeholder="e.g. Double Bed, 89x90 inches">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Image Key</label>
+                <input type="text" id="edit-image-key" class="form-input" placeholder="e.g. blanket_plain_blue">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Image URL (Optional custom image)</label>
+                <input type="url" id="edit-image-uri" class="form-input" placeholder="https://...">
+              </div>
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label class="form-label">Short Spec</label>
+              <input type="text" id="edit-short-spec" class="form-input" placeholder="e.g. Double Bed • Fleece • Blue">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Full Description</label>
+              <textarea id="edit-desc" class="form-textarea" rows="3"></textarea>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 16px;">
+              <button type="submit" class="btn-primary" style="padding: 10px 24px;">Save Product</button>
+              <button type="button" id="btn-cancel-prod" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Products Table -->
+        <div class="card" style="overflow-x: auto; padding: 0;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+              <tr style="background: var(--surface-low); border-bottom: 1px solid var(--outline-variant); text-align: left;">
+                <th style="padding: 12px 16px;">ID</th>
+                <th style="padding: 12px 16px;">Name</th>
+                <th style="padding: 12px 16px;">Category</th>
+                <th style="padding: 12px 16px;">Price</th>
+                <th style="padding: 12px 16px;">Stock</th>
+                <th style="padding: 12px 16px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-products-tbody">
+              <!-- Products injected here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Orders Section -->
+      <div id="section-orders" style="display: none;">
+        <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 16px;">Customer Orders (<span id="admin-orders-count">0</span>)</h2>
+        <div id="admin-orders-list" style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- Orders injected here -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 GharBazar Admin Console • Strictly Authorized Personnel Only</p>
+  </footer>
+
+  <script type="module">
+    import { onAuth, logInWithEmail, logOut, adminGetProducts, adminSaveProduct, adminDeleteProduct, adminGetAllOrders, adminUpdateOrderStatus, seedProductsToFirestore, formatPkr, formatAuthError } from './js/app.js';
+
+    const ADMIN_EMAIL = 'adeel.arif0786@gmail.com';
+
+    const authContainer = document.getElementById('admin-auth-container');
+    const refusalContainer = document.getElementById('admin-refusal-container');
+    const dashboardContainer = document.getElementById('admin-dashboard-container');
+    const headerActions = document.getElementById('admin-header-actions');
+
+    let allAdminProducts = [];
+    let allAdminOrders = [];
+
+    onAuth(async (user) => {
+      if (!user) {
+        authContainer.style.display = 'block';
+        refusalContainer.style.display = 'none';
+        dashboardContainer.style.display = 'none';
+        headerActions.style.display = 'none';
+        return;
+      }
+
+      if (user.email !== ADMIN_EMAIL) {
+        authContainer.style.display = 'none';
+        refusalContainer.style.display = 'block';
+        dashboardContainer.style.display = 'none';
+        headerActions.style.display = 'flex';
+        document.getElementById('refused-email').textContent = user.email;
+        document.getElementById('admin-user-email').textContent = user.email;
+        return;
+      }
+
+      // Authorized Admin!
+      authContainer.style.display = 'none';
+      refusalContainer.style.display = 'none';
+      dashboardContainer.style.display = 'block';
+      headerActions.style.display = 'flex';
+      document.getElementById('admin-user-email').textContent = user.email;
+
+      loadAdminData();
+    });
+
+    document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('admin-email').value.trim();
+      const password = document.getElementById('admin-password').value;
+      const alertBox = document.getElementById('admin-login-alert');
+
+      if (email !== ADMIN_EMAIL) {
+        alertBox.style.display = 'block';
+        alertBox.style.background = '#FCE8E6';
+        alertBox.style.color = 'var(--error)';
+        alertBox.textContent = "Access denied: Email must be adeel.arif0786@gmail.com";
+        return;
+      }
+
+      try {
+        await logInWithEmail(email, password);
+      } catch (err) {
+        alertBox.style.display = 'block';
+        alertBox.style.background = '#FCE8E6';
+        alertBox.style.color = 'var(--error)';
+        alertBox.textContent = formatAuthError(err);
+      }
+    });
+
+    document.getElementById('admin-logout-btn').addEventListener('click', async () => {
+      await logOut();
+      window.location.reload();
+    });
+
+    document.getElementById('refusal-logout-btn').addEventListener('click', async () => {
+      await logOut();
+      window.location.reload();
+    });
+
+    // Tabs
+    const tabProductsBtn = document.getElementById('tab-products-btn');
+    const tabOrdersBtn = document.getElementById('tab-orders-btn');
+    const sectionProducts = document.getElementById('section-products');
+    const sectionOrders = document.getElementById('section-orders');
+
+    tabProductsBtn.addEventListener('click', () => {
+      tabProductsBtn.className = 'btn-primary';
+      tabOrdersBtn.className = 'btn-secondary';
+      sectionProducts.style.display = 'block';
+      sectionOrders.style.display = 'none';
+    });
+
+    tabOrdersBtn.addEventListener('click', () => {
+      tabOrdersBtn.className = 'btn-primary';
+      tabProductsBtn.className = 'btn-secondary';
+      sectionOrders.style.display = 'block';
+      sectionProducts.style.display = 'none';
+      loadOrdersTable();
+    });
+
+    document.getElementById('seed-btn').addEventListener('click', async () => {
+      if (confirm("Seed default 8 products to Firestore?")) {
+        try {
+          await seedProductsToFirestore();
+          alert("Default products seeded successfully!");
+          loadAdminData();
+        } catch (err) {
+          alert("Error seeding products: " + err.message);
+        }
+      }
+    });
+
+    async function loadAdminData() {
+      allAdminProducts = await adminGetProducts();
+      renderProductsTable();
+      allAdminOrders = await adminGetAllOrders();
+      document.getElementById('admin-orders-count').textContent = allAdminOrders.length;
+    }
+
+    function renderProductsTable() {
+      const tbody = document.getElementById('admin-products-tbody');
+      document.getElementById('admin-prod-count').textContent = allAdminProducts.length;
+
+      if (allAdminProducts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--on-surface-variant);">No products found. Click 'Seed Default 8 Products' above.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = allAdminProducts.map(p => `
+        <tr style="border-bottom: 1px solid var(--outline-variant);">
+          <td style="padding: 12px 16px; font-family: monospace; font-size: 0.85rem;">${p.id}</td>
+          <td style="padding: 12px 16px; font-weight: 600;">${p.name}</td>
+          <td style="padding: 12px 16px;"><span style="background: var(--surface-low); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">${p.category}</span></td>
+          <td style="padding: 12px 16px; font-weight: 700; color: var(--primary);">${formatPkr(p.pricePkr)}</td>
+          <td style="padding: 12px 16px;">${p.stockQuantity || 20}</td>
+          <td style="padding: 12px 16px; text-align: right; white-space: nowrap;">
+            <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="window.editProduct('${p.id}')">Edit</button>
+            <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px; color: var(--error); border-color: var(--error);" onclick="window.deleteProduct('${p.id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Product Form Handlers
+    const prodFormCard = document.getElementById('product-form-card');
+    document.getElementById('btn-new-product').addEventListener('click', () => {
+      document.getElementById('product-form-title').textContent = "Add New Product";
+      document.getElementById('product-edit-form').reset();
+      document.getElementById('edit-prod-id').value = '';
+      prodFormCard.style.display = 'block';
+      prodFormCard.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('close-prod-form').addEventListener('click', () => {
+      prodFormCard.style.display = 'none';
+    });
+
+    document.getElementById('btn-cancel-prod').addEventListener('click', () => {
+      prodFormCard.style.display = 'none';
+    });
+
+    window.editProduct = (id) => {
+      const p = allAdminProducts.find(item => item.id === id);
+      if (!p) return;
+      document.getElementById('product-form-title').textContent = "Edit Product: " + p.id;
+      document.getElementById('edit-prod-id').value = p.id;
+      document.getElementById('edit-name').value = p.name || '';
+      document.getElementById('edit-price').value = p.pricePkr || '';
+      document.getElementById('edit-category').value = p.category || 'BLANKETS';
+      document.getElementById('edit-stock').value = p.stockQuantity || 20;
+      document.getElementById('edit-fabric').value = p.fabric || '';
+      document.getElementById('edit-size').value = p.size || '';
+      document.getElementById('edit-image-key').value = p.imageKey || '';
+      document.getElementById('edit-image-uri').value = p.imageUri || '';
+      document.getElementById('edit-short-spec').value = p.shortSpec || '';
+      document.getElementById('edit-desc').value = p.description || '';
+      prodFormCard.style.display = 'block';
+      prodFormCard.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    window.deleteProduct = async (id) => {
+      if (confirm("Are you sure you want to delete product '" + id + "'?")) {
+        try {
+          await adminDeleteProduct(id);
+          alert("Product deleted.");
+          loadAdminData();
+        } catch (err) {
+          alert("Failed to delete: " + err.message);
+        }
+      }
+    };
+
+    document.getElementById('product-edit-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('edit-prod-id').value.trim();
+      const name = document.getElementById('edit-name').value.trim();
+      const pricePkr = Number(document.getElementById('edit-price').value);
+      const category = document.getElementById('edit-category').value;
+      const stockQuantity = Number(document.getElementById('edit-stock').value);
+      const fabric = document.getElementById('edit-fabric').value.trim();
+      const size = document.getElementById('edit-size').value.trim();
+      const imageKey = document.getElementById('edit-image-key').value.trim();
+      const imageUri = document.getElementById('edit-image-uri').value.trim();
+      const shortSpec = document.getElementById('edit-short-spec').value.trim();
+      const description = document.getElementById('edit-desc').value.trim();
+
+      const productObj = {
+        id: id || undefined,
+        name,
+        pricePkr,
+        category,
+        stockQuantity,
+        inStock: stockQuantity > 0,
+        fabric,
+        size,
+        imageKey: imageKey || 'blanket_plain_blue',
+        imageUri: imageUri || null,
+        shortSpec,
+        description,
+        specs: [
+          { label: "Category", value: category },
+          { label: "Size", value: size || "Standard" },
+          { label: "Fabric", value: fabric || "Standard" }
+        ]
+      };
+
+      try {
+        await adminSaveProduct(productObj);
+        alert("Product saved successfully!");
+        prodFormCard.style.display = 'none';
+        loadAdminData();
+      } catch (err) {
+        alert("Failed to save product: " + err.message);
+      }
+    });
+
+    async function loadOrdersTable() {
+      allAdminOrders = await adminGetAllOrders();
+      const container = document.getElementById('admin-orders-list');
+      document.getElementById('admin-orders-count').textContent = allAdminOrders.length;
+
+      if (allAdminOrders.length === 0) {
+        container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--on-surface-variant);">No customer orders found in Firestore.</div>`;
+        return;
+      }
+
+      container.innerHTML = allAdminOrders.map(ord => {
+        const dateStr = ord.createdAt?.seconds ? new Date(ord.createdAt.seconds * 1000).toLocaleString() : (ord.timestamp ? new Date(ord.timestamp).toLocaleString() : 'Recent');
+        return `
+          <div class="card" style="padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--outline-variant); padding-bottom: 8px;">
+              <div>
+                <span style="font-size: 1.15rem; font-weight: 800; color: var(--primary);">${ord.orderNumber}</span>
+                <span style="font-size: 0.85rem; color: var(--on-surface-variant); margin-left: 10px;">${dateStr}</span>
+                <span style="font-size: 0.8rem; background: var(--surface-low); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">User ID: ${ord.userId || 'guest'}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-size: 0.85rem; font-weight: 600;">Status:</label>
+                <select class="form-input" style="padding: 6px 10px; font-size: 0.85rem; font-weight: 700;" onchange="window.updateStatus('${ord.id}', this.value)">
+                  <option value="placed" ${ord.status === 'placed' ? 'selected' : ''}>Placed</option>
+                  <option value="confirmed" ${ord.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+                  <option value="shipped" ${ord.status === 'shipped' ? 'selected' : ''}>Shipped</option>
+                  <option value="delivered" ${ord.status === 'delivered' ? 'selected' : ''}>Delivered</option>
+                </select>
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 0.9rem; margin-bottom: 12px;">
+              <div>
+                <strong>Customer:</strong> ${ord.customerName} (${ord.phoneNumber})<br>
+                <strong>Address:</strong> ${ord.deliveryAddress}, ${ord.city}
+              </div>
+              <div>
+                <strong>Total Amount:</strong> <span style="color: var(--primary); font-weight: 700;">${formatPkr(ord.totalPkr)}</span> (Cash on Delivery)
+              </div>
+            </div>
+            <div style="font-size: 0.85rem; background: var(--surface-low); padding: 10px; border-radius: var(--radius-sm);">
+              <strong>Items (${ord.items ? ord.items.reduce((s,i)=>s+i.quantity,0) : 0}):</strong>
+              ${ord.items ? ord.items.map(i => `${i.product.name} (Qty: ${i.quantity})`).join(', ') : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.updateStatus = async (orderId, newStatus) => {
+      try {
+        await adminUpdateOrderStatus(orderId, newStatus);
+        alert("Order status updated to '" + newStatus + "'");
+      } catch (err) {
+        alert("Failed to update order status: " + err.message);
+      }
+    };
+  </script>
+</body>
+</html>

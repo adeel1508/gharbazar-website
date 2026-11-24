@@ -71,7 +71,7 @@
 
   <!-- App Script -->
   <script type="module">
-    import { subscribeProducts, formatPkr, getImageSrc, addToCart, updateCartBadge, setupCartDrawer, toggleCartModal } from './js/app.js';
+    import { subscribeProducts, formatPkr, getImageSrc, addToCart, updateCartBadge, setupCartDrawer, toggleCartModal, setupHeaderAuth } from './js/app.js';
 
     let allProducts = [];
     let currentCategory = 'ALL';
@@ -81,6 +81,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       updateCartBadge();
       setupCartDrawer();
+      setupHeaderAuth();
 
       document.getElementById('open-cart-btn').addEventListener('click', toggleCartModal);
 

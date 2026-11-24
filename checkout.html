@@ -101,9 +101,33 @@
 
   <!-- App Script -->
   <script type="module">
-    import { getCart, getCartTotalPkr, formatPkr, getImageSrc, POPULAR_CITIES, placeOrder } from './js/app.js';
+    import { getCart, getCartTotalPkr, formatPkr, getImageSrc, POPULAR_CITIES, placeOrder, onAuth, getUserProfile, setupHeaderAuth } from './js/app.js';
 
     document.addEventListener('DOMContentLoaded', () => {
+      setupHeaderAuth();
+
+      // Check login state: redirect to auth if not logged in
+      onAuth(async (user) => {
+        if (!user) {
+          window.location.href = 'auth.html?redirect=checkout.html';
+          return;
+        }
+
+        // Prefill name & phone if available in user profile
+        const profile = await getUserProfile(user.uid);
+        if (profile) {
+          if (profile.displayName && !document.getElementById('customer-name').value) {
+            document.getElementById('customer-name').value = profile.displayName;
+          }
+          if (profile.phone && !document.getElementById('phone-number').value) {
+            document.getElementById('phone-number').value = profile.phone;
+          }
+          if (profile.addresses && profile.addresses.length > 0 && !document.getElementById('delivery-address').value) {
+            document.getElementById('delivery-address').value = profile.addresses[0];
+          }
+        }
+      });
+
       const cart = getCart();
       if (cart.length === 0) {
         alert("Your cart is empty. Redirecting to shop.");
@@ -199,10 +223,9 @@
 
         if (hasError) return;
 
-        // Disable button to prevent double submit
-        const placeBtn = document.getElementById('place-order-btn');
-        placeBtn.disabled = true;
-        placeBtn.textContent = "Placing Order...";
+        const btn = document.getElementById('place-order-btn');
+        btn.disabled = true;
+        btn.textContent = "Placing Order...";
 
         placeOrder({
           customerName: nameVal,

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Account - GharBazar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="nav-container">
+      <a href="index.html" class="brand-logo">
+        <div class="brand-icon">GB</div>
+        <div>
+          <div class="brand-title">GharBazar</div>
+          <div class="brand-subtitle">Pakistan Boutique</div>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <a href="index.html" class="btn-secondary" style="font-size: 0.9rem;">← Back to Store</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="checkout-container" style="max-width: 800px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <div>
+          <h1 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 4px;">My Account</h1>
+          <p style="color: var(--on-surface-variant);">Manage your profile, saved addresses, and view order history.</p>
+        </div>
+        <button id="logout-btn" class="btn-secondary" style="color: var(--error); border-color: var(--error);">Log Out</button>
+      </div>
+
+      <!-- Alert Box -->
+      <div id="account-alert" style="display: none; padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 20px; font-size: 0.9rem; font-weight: 500;"></div>
+
+      <!-- Profile & Addresses Card -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-title">Profile & Delivery Addresses</div>
+        <form id="profile-form">
+          <div class="form-group">
+            <label class="form-label" for="acc-email">Email Address (Login ID)</label>
+            <input type="email" id="acc-email" class="form-input" disabled style="background: var(--surface-low); color: var(--on-surface-variant);">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="acc-name">Full Name *</label>
+            <input type="text" id="acc-name" class="form-input" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="acc-phone">Phone Number *</label>
+            <input type="tel" id="acc-phone" class="form-input" placeholder="e.g. 03001234567" required>
+          </div>
+
+          <button type="submit" id="btn-save-profile" class="btn-primary" style="padding: 10px 20px; font-size: 0.9rem;">
+            Save Profile Details
+          </button>
+        </form>
+
+        <hr style="border: none; border-top: 1px solid var(--outline-variant); margin: 24px 0;">
+
+        <!-- Saved Addresses Section -->
+        <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 12px;">Saved Delivery Addresses</h3>
+        <div id="saved-addresses-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+          <!-- Addresses injected here -->
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="new-address-input" class="form-input" placeholder="Add a new delivery address...">
+          <button type="button" id="btn-add-address" class="btn-secondary" style="white-space: nowrap;">Add Address</button>
+        </div>
+      </div>
+
+      <!-- Order History Card -->
+      <div class="card">
+        <div class="card-title">My Order History</div>
+        <div id="order-history-list" style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="text-align: center; padding: 30px; color: var(--on-surface-variant);">Loading order history...</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 GharBazar E-Commerce • Cash on Delivery Across Pakistan</p>
+  </footer>
+
+  <script type="module">
+    import { onAuth, getUserProfile, updateUserProfile, getUserOrders, logOut, formatPkr } from './js/app.js';
+
+    let currentUser = null;
+    let userProfile = null;
+
+    const alertBox = document.getElementById('account-alert');
+
+    function showAlert(msg, isSuccess = false) {
+      alertBox.style.display = 'block';
+      alertBox.style.background = isSuccess ? 'var(--success-container)' : '#FCE8E6';
+      alertBox.style.color = isSuccess ? 'var(--success)' : 'var(--error)';
+      alertBox.style.border = isSuccess ? '1px solid var(--success)' : '1px solid var(--error)';
+      alertBox.textContent = msg;
+    }
+
+    onAuth(async (user) => {
+      if (!user) {
+        window.location.href = 'auth.html?redirect=account.html';
+        return;
+      }
+      currentUser = user;
+      document.getElementById('acc-email').value = user.email || "";
+      document.getElementById('acc-name').value = user.displayName || "";
+
+      // Load Firestore profile
+      userProfile = await getUserProfile(user.uid);
+      if (userProfile) {
+        if (userProfile.displayName) document.getElementById('acc-name').value = userProfile.displayName;
+        if (userProfile.phone) document.getElementById('acc-phone').value = userProfile.phone;
+        renderAddresses(userProfile.addresses || []);
+      } else {
+        renderAddresses([]);
+      }
+
+      // Load user orders
+      loadOrders(user.uid);
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await logOut();
+      window.location.href = 'index.html';
+    });
+
+    document.getElementById('profile-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const displayName = document.getElementById('acc-name').value.trim();
+      const phone = document.getElementById('acc-phone').value.trim();
+
+      if (!displayName || !phone) {
+        showAlert("Please enter both name and phone number.");
+        return;
+      }
+
+      try {
+        await updateUserProfile(currentUser.uid, {
+          displayName,
+          phone,
+          email: currentUser.email
+        });
+        showAlert("Profile updated successfully!", true);
+      } catch (err) {
+        showAlert("Failed to update profile: " + err.message);
+      }
+    });
+
+    function renderAddresses(addresses) {
+      const container = document.getElementById('saved-addresses-list');
+      if (!addresses || addresses.length === 0) {
+        container.innerHTML = `<p style="font-size: 0.9rem; color: var(--on-surface-variant); font-style: italic;">No saved addresses yet.</p>`;
+        return;
+      }
+
+      container.innerHTML = addresses.map((addr, idx) => `
+        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--surface-low); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.9rem;">
+          <span>📍 ${addr}</span>
+          <button type="button" class="btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; color: var(--error);" onclick="window.gbRemoveAddress(${idx})">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    window.gbRemoveAddress = async (index) => {
+      if (!userProfile || !userProfile.addresses) return;
+      userProfile.addresses.splice(index, 1);
+      try {
+        await updateUserProfile(currentUser.uid, { addresses: userProfile.addresses });
+        renderAddresses(userProfile.addresses);
+        showAlert("Address removed.", true);
+      } catch (err) {
+        showAlert("Failed to remove address: " + err.message);
+      }
+    };
+
+    document.getElementById('btn-add-address').addEventListener('click', async () => {
+      const input = document.getElementById('new-address-input');
+      const val = input.value.trim();
+      if (!val) return;
+
+      const addresses = (userProfile && userProfile.addresses) ? [...userProfile.addresses] : [];
+      addresses.push(val);
+
+      try {
+        await updateUserProfile(currentUser.uid, { addresses });
+        userProfile.addresses = addresses;
+        renderAddresses(addresses);
+        input.value = '';
+        showAlert("Address added successfully!", true);
+      } catch (err) {
+        showAlert("Failed to add address: " + err.message);
+      }
+    });
+
+    async function loadOrders(uid) {
+      const container = document.getElementById('order-history-list');
+      const orders = await getUserOrders(uid);
+
+      if (orders.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 30px; color: var(--on-surface-variant);">
+            <p style="font-weight: 600; margin-bottom: 4px;">No orders placed yet</p>
+            <p style="font-size: 0.85rem;">Your Cash on Delivery orders will appear here once placed.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = orders.map(ord => {
+        const statusColors = {
+          placed: { bg: '#FEF3C7', fg: '#92400E' },
+          confirmed: { bg: '#E0E7FF', fg: '#3730A3' },
+          shipped: { bg: '#E0F2FE', fg: '#0369A1' },
+          delivered: { bg: '#C9EAD7', fg: '#235D43' }
+        };
+        const st = statusColors[ord.status] || { bg: '#F0E7DC', fg: '#5B4D44' };
+        const dateStr = ord.createdAt?.seconds ? new Date(ord.createdAt.seconds * 1000).toLocaleString() : (ord.timestamp ? new Date(ord.timestamp).toLocaleString() : 'Recent');
+
+        return `
+          <div style="background: var(--surface-low); border: 1px solid var(--outline-variant); border-radius: var(--radius-sm); padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div>
+                <span style="font-weight: 800; font-size: 1.05rem; color: var(--primary);">${ord.orderNumber}</span>
+                <span style="font-size: 0.8rem; color: var(--on-surface-variant); margin-left: 8px;">(${dateStr})</span>
+              </div>
+              <span style="background: ${st.bg}; color: ${st.fg}; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase;">
+                ${ord.status || 'placed'}
+              </span>
+            </div>
+            <div style="font-size: 0.9rem; margin-bottom: 8px;">
+              <strong>Delivery:</strong> ${ord.deliveryAddress}, ${ord.city} (${ord.phoneNumber})
+            </div>
+            <div style="font-size: 0.9rem; margin-bottom: 8px;">
+              <strong>Items (${ord.items ? ord.items.reduce((s,i)=>s+i.quantity,0) : 0}):</strong> 
+              ${ord.items ? ord.items.map(i => `${i.product.name} (x${i.quantity})`).join(', ') : ''}
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--outline); padding-top: 8px; font-weight: 700;">
+              <span>Total (COD):</span>
+              <span style="color: var(--primary);">${formatPkr(ord.totalPkr)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
