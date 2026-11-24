@@ -7,15 +7,48 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email == 'adeel.arif0786@gmail.com';
     }
 
+    // A guest COD order: no signed-in user, no userId on the order,
+    // and the fields the checkout actually writes, with sane values.
+    // The Android app has no login and writes orders without userId,
+    // so without this branch every app order would be denied.
+    function isValidGuestOrder() {
+      return request.auth == null
+        && (!('userId' in request.resource.data) || request.resource.data.userId == null)
+        && request.resource.data.customerName is string
+        && request.resource.data.customerName.size() > 0
+        && request.resource.data.phoneNumber is string
+        && request.resource.data.phoneNumber.size() > 0
+        && request.resource.data.deliveryAddress is string
+        && request.resource.data.deliveryAddress.size() > 0
+        && request.resource.data.city is string
+        && request.resource.data.city.size() > 0
+        && request.resource.data.orderNumber is string
+        && request.resource.data.status == 'placed'
+        && request.resource.data.totalPkr is int
+        && request.resource.data.totalPkr >= 1
+        && request.resource.data.totalPkr <= 10000000
+        && request.resource.data.items is list
+        && request.resource.data.items.size() >= 1
+        && request.resource.data.items.size() <= 50;
+    }
+
     // Products: Public read, admin-only write
     match /products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Orders: Signed-in user may create order with userId == their uid, read own orders, admin reads/updates all
+    // Orders: Signed-in user may create order with userId == their uid, read own orders, admin reads/updates all.
+    // Guest (app / no-login) COD orders may be created without auth, but only with the
+    // validated fields above. Reads stay restricted: a guest order can only be read by
+    // the admin (website admin panel, signed in as adeel.arif0786@gmail.com).
+    // NOTE: the app's own Admin Orders tab runs without sign-in, so it still cannot
+    // READ orders or change status under these rules — that needs app-side auth
+    // (anonymous auth or an admin login in the app). App orders WILL show in the
+    // website admin panel once written.
     match /orders/{orderId} {
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow create: if (request.auth != null && request.resource.data.userId == request.auth.uid)
+        || isValidGuestOrder();
       allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isAdmin());
       allow update, delete: if isAdmin();
     }
@@ -28,6 +61,12 @@ service cloud.firestore {
     // Carts: Owner-only read/write
     match /carts/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // App update check: anyone may read the version info so the app can check for updates; only the admin may change it.
+    match /app_config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }
