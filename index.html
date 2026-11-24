@@ -91,14 +91,16 @@
         renderProducts();
       });
 
-      // Category filters
-      document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-          e.target.classList.add('active');
-          currentCategory = e.target.getAttribute('data-category');
-          renderProducts();
-        });
+      // Category filters (delegated: the filter buttons are rebuilt from
+      // the loaded products, so per-button listeners attached at load
+      // would be lost on every rebuild)
+      document.getElementById('category-filters').addEventListener('click', (e) => {
+        const btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentCategory = btn.getAttribute('data-category');
+        renderProducts();
       });
 
       // Sort select
@@ -121,9 +123,46 @@
           dot.classList.remove('live');
         }
 
+        renderCategoryFilters();
         renderProducts();
       });
     });
+
+    // Display label for a stored category value ("BLANKETS" -> "Blankets",
+    // "MENS_SUITS" -> "Men's Suits"; any custom value passes through as-is).
+    function categoryLabel(value) {
+      const v = (value || '').trim();
+      if (!v) return 'Blankets';
+      if (v.toUpperCase() === 'BLANKETS') return 'Blankets';
+      if (v.toUpperCase() === 'MENS_SUITS') return "Men's Suits";
+      return v;
+    }
+
+    // Rebuilds the filter chips from the loaded products: All first, then
+    // the two built-in categories (only if present), then any custom
+    // categories alphabetically, each with a count. The chips carry the
+    // stored category value in data-category, so the existing exact-match
+    // filter in renderProducts() already works for custom categories.
+    function renderCategoryFilters() {
+      const wrap = document.getElementById('category-filters');
+      if (!wrap) return;
+      const counts = {};
+      allProducts.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+      const ordered = ['ALL'];
+      if (counts['BLANKETS']) ordered.push('BLANKETS');
+      if (counts['MENS_SUITS']) ordered.push('MENS_SUITS');
+      Object.keys(counts)
+        .filter(c => c !== 'BLANKETS' && c !== 'MENS_SUITS')
+        .sort((a, b) => a.localeCompare(b))
+        .forEach(c => ordered.push(c));
+      const total = allProducts.length;
+      wrap.innerHTML = ordered.map(c => {
+        const label = c === 'ALL' ? 'All Products' : categoryLabel(c);
+        const count = c === 'ALL' ? total : counts[c];
+        const active = currentCategory === c ? ' active' : '';
+        return `<button class="filter-btn${active}" data-category="${c}">${label} (${count})</button>`;
+      }).join('');
+    }
 
     function renderProducts() {
       const grid = document.getElementById('product-grid');
@@ -154,7 +193,7 @@
       grid.innerHTML = filtered.map(p => `
         <div class="product-card">
           <div class="product-img-wrap">
-            <span class="category-tag">${p.category === 'MENS_SUITS' ? "Men's Suit" : "Blanket"}</span>
+            <span class="category-tag">${categoryLabel(p.category)}</span>
             <img src="${getImageSrc(p)}" alt="${p.name}" class="product-img" loading="lazy">
           </div>
           <div class="product-info">

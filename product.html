@@ -85,10 +85,20 @@
       });
     });
 
+    // Display label for a stored category value ("BLANKETS" -> "Blankets",
+    // "MENS_SUITS" -> "Men's Suits"; any custom value passes through as-is).
+    function categoryLabel(value) {
+      const v = (value || '').trim();
+      if (!v) return 'Blankets';
+      if (v.toUpperCase() === 'BLANKETS') return 'Blankets';
+      if (v.toUpperCase() === 'MENS_SUITS') return "Men's Suits";
+      return v;
+    }
+
     function renderProductDetail(p) {
       const container = document.getElementById('product-detail-container');
       const specs = p.specs || [
-        { label: "Category", value: p.category },
+        { label: "Category", value: categoryLabel(p.category) },
         { label: "Size / Cutting", value: p.size },
         { label: "Fabric", value: p.fabric }
       ];
@@ -99,7 +109,7 @@
         </div>
         <div class="detail-content">
           <span style="font-size: 0.85rem; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px;">
-            ${p.category === 'MENS_SUITS' ? "Men's Unstitched Suit" : "Double Bed Blanket"}
+            ${categoryLabel(p.category)}
           </span>
           <h1 class="detail-title">${p.name}</h1>
           <div class="detail-price">${formatPkr(p.pricePkr)}</div>

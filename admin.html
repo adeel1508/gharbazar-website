@@ -102,9 +102,11 @@
               <div class="form-group">
                 <label class="form-label">Category *</label>
                 <select id="edit-category" class="form-input">
-                  <option value="BLANKETS">BLANKETS</option>
-                  <option value="MENS_SUITS">MENS_SUITS</option>
+                  <option value="BLANKETS">Blankets</option>
+                  <option value="MENS_SUITS">Men's Suits</option>
+                  <option value="OTHER">Other (custom)…</option>
                 </select>
+                <input type="text" id="edit-category-custom" class="form-input" placeholder="Custom category (e.g. Bedsheets)" style="display: none; margin-top: 8px;">
               </div>
               <div class="form-group">
                 <label class="form-label">Stock Quantity *</label>
@@ -327,7 +329,7 @@
         <tr style="border-bottom: 1px solid var(--outline-variant);">
           <td style="padding: 12px 16px; font-family: monospace; font-size: 0.85rem;">${p.id}</td>
           <td style="padding: 12px 16px; font-weight: 600;">${p.name}</td>
-          <td style="padding: 12px 16px;"><span style="background: var(--surface-low); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">${p.category}</span></td>
+          <td style="padding: 12px 16px;"><span style="background: var(--surface-low); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">${categoryLabel(p.category)}</span></td>
           <td style="padding: 12px 16px; font-weight: 700; color: var(--primary);">${formatPkr(p.pricePkr)}</td>
           <td style="padding: 12px 16px;">${p.stockQuantity || 20}</td>
           <td style="padding: 12px 16px; text-align: right; white-space: nowrap;">
@@ -356,6 +358,16 @@
       prodFormCard.style.display = 'none';
     });
 
+    // Display label for a stored category value ("BLANKETS" -> "Blankets",
+    // "MENS_SUITS" -> "Men's Suits"; any custom value passes through as-is).
+    function categoryLabel(value) {
+      const v = (value || '').trim();
+      if (!v) return 'Blankets';
+      if (v.toUpperCase() === 'BLANKETS') return 'Blankets';
+      if (v.toUpperCase() === 'MENS_SUITS') return "Men's Suits";
+      return v;
+    }
+
     window.editProduct = (id) => {
       const p = allAdminProducts.find(item => item.id === id);
       if (!p) return;
@@ -363,7 +375,20 @@
       document.getElementById('edit-prod-id').value = p.id;
       document.getElementById('edit-name').value = p.name || '';
       document.getElementById('edit-price').value = p.pricePkr || '';
-      document.getElementById('edit-category').value = p.category || 'BLANKETS';
+      // A custom category (anything but the two built-ins) opens the
+      // "Other" option with the stored value in the free-text field, so
+      // editing never silently resets it to BLANKETS.
+      const catSel = document.getElementById('edit-category');
+      const catCustom = document.getElementById('edit-category-custom');
+      if (p.category === 'BLANKETS' || p.category === 'MENS_SUITS') {
+        catSel.value = p.category || 'BLANKETS';
+        catCustom.value = '';
+        catCustom.style.display = 'none';
+      } else {
+        catSel.value = 'OTHER';
+        catCustom.value = p.category || '';
+        catCustom.style.display = 'block';
+      }
       document.getElementById('edit-stock').value = p.stockQuantity || 20;
       document.getElementById('edit-fabric').value = p.fabric || '';
       document.getElementById('edit-size').value = p.size || '';
@@ -387,12 +412,25 @@
       }
     };
 
+    // Show the free-text field only when "Other (custom)" is picked.
+    document.getElementById('edit-category').addEventListener('change', (e) => {
+      document.getElementById('edit-category-custom').style.display =
+        e.target.value === 'OTHER' ? 'block' : 'none';
+    });
+
     document.getElementById('product-edit-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = document.getElementById('edit-prod-id').value.trim();
       const name = document.getElementById('edit-name').value.trim();
       const pricePkr = Number(document.getElementById('edit-price').value);
-      const category = document.getElementById('edit-category').value;
+      const categorySel = document.getElementById('edit-category').value;
+      const category = categorySel === 'OTHER'
+        ? document.getElementById('edit-category-custom').value.trim()
+        : categorySel;
+      if (!category || category.toUpperCase() === 'ALL' || category.length > 40) {
+        alert('Please enter a valid category name (not "All", max 40 characters).');
+        return;
+      }
       const stockQuantity = Number(document.getElementById('edit-stock').value);
       const fabric = document.getElementById('edit-fabric').value.trim();
       const size = document.getElementById('edit-size').value.trim();
