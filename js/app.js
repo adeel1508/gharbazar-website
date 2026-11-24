@@ -188,6 +188,8 @@ try {
   console.warn("Firebase initialization warning:", e);
 }
 
+let cartSyncedUid = null;
+
 export function onAuth(callback) {
   if (!auth) {
     callback(null);
@@ -195,7 +197,16 @@ export function onAuth(callback) {
   }
   return onAuthStateChanged(auth, async (user) => {
     if (user) {
-      await loadCloudCartOnLogin(user.uid);
+      // Run the cloud-cart sync at most once per signed-in user per page load.
+      // setupHeaderAuth() and individual pages each register their own onAuth
+      // listener, so without this guard the merge below would run concurrently
+      // twice (or more) on the same page.
+      if (cartSyncedUid !== user.uid) {
+        cartSyncedUid = user.uid;
+        await loadCloudCartOnLogin(user.uid);
+      }
+    } else {
+      cartSyncedUid = null;
     }
     callback(user);
   });
@@ -410,36 +421,58 @@ export async function loadCloudCartOnLogin(uid) {
     const cartRef = doc(db, "carts", uid);
     const cartSnap = await getDoc(cartRef);
     const localCart = getCart();
+    const localRev = getCartRev();
 
     if (cartSnap.exists()) {
-      const cloudItems = cartSnap.data().items || [];
-      const mergedMap = new Map();
-      cloudItems.forEach(item => mergedMap.set(item.product.id, { ...item }));
-      localCart.forEach(item => {
-        if (mergedMap.has(item.product.id)) {
-          mergedMap.get(item.product.id).quantity += item.quantity;
-        } else {
-          mergedMap.set(item.product.id, { ...item });
-        }
-      });
-      const mergedCart = Array.from(mergedMap.values());
-      localStorage.setItem('gharbazar_cart', JSON.stringify(mergedCart));
-      await setDoc(cartRef, { items: mergedCart, updatedAt: serverTimestamp() }, { merge: true });
-      updateCartBadge();
+      const data = cartSnap.data() || {};
+      const cloudItems = data.items || [];
+      const cloudRev = Number(data.rev) || 0;
+      if (cloudRev > localRev) {
+        // The cloud cart is NEWER (changed on another device) — adopt it as-is.
+        // NEVER add cloud + local quantities: the cloud cart is the same cart
+        // this browser already synced, not extra items. Adding them is what
+        // inflated orders (display 1, ordered 3 on GB-641124).
+        localStorage.setItem('gharbazar_cart', JSON.stringify(cloudItems));
+        setCartRev(cloudRev);
+        updateCartBadge();
+      } else {
+        // Local cart is newer or equal — keep it, and push it to the cloud so
+        // a stale cloud snapshot can never override (or resurrect) local items.
+        await setDoc(cartRef, { items: localCart, rev: localRev, updatedAt: serverTimestamp() }, { merge: true });
+      }
     } else if (localCart.length > 0) {
-      await setDoc(cartRef, { items: localCart, updatedAt: serverTimestamp() });
+      await setDoc(cartRef, { items: localCart, rev: localRev, updatedAt: serverTimestamp() });
     }
   } catch (e) {
     console.warn("Failed to load cloud cart on login:", e);
   }
 }
 
+// Cart revision: bumped on every local cart change, mirrored to the cloud cart
+// doc. Lets the login sync tell which copy is newer without ever summing
+// quantities. Missing value (old carts) counts as revision 0.
+export function getCartRev() {
+  try {
+    return Number(localStorage.getItem('gharbazar_cart_rev')) || 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+export function setCartRev(rev) {
+  try {
+    localStorage.setItem('gharbazar_cart_rev', String(rev));
+  } catch (e) {}
+}
+
 export function saveCart(cart) {
+  const rev = getCartRev() + 1;
+  setCartRev(rev);
   localStorage.setItem('gharbazar_cart', JSON.stringify(cart));
   updateCartBadge();
   if (db && auth && auth.currentUser) {
     const uid = auth.currentUser.uid;
-    setDoc(doc(db, "carts", uid), { items: cart, updatedAt: serverTimestamp() }, { merge: true }).catch(e => {
+    setDoc(doc(db, "carts", uid), { items: cart, rev, updatedAt: serverTimestamp() }, { merge: true }).catch(e => {
       console.warn("Failed to sync cart to cloud:", e);
     });
   }
@@ -535,9 +568,19 @@ export function subscribeProducts(onProductsLoaded) {
   }
 }
 
-export async function placeOrder(orderData, callback) {
+export async function placeOrder(orderData, callback, itemsSnapshot) {
   const orderNumber = "GB-" + Math.floor(100000 + Math.random() * 900000);
   const uid = auth && auth.currentUser ? auth.currentUser.uid : null;
+
+  // Order exactly the cart the customer saw at checkout. The cart in
+  // localStorage can still change while the delivery form is being filled
+  // (e.g. a cloud sync landing), so re-reading it here could order different
+  // quantities than the checkout summary showed. checkout.html passes the
+  // snapshot it rendered; anything else falls back to the live cart.
+  const cartForOrder = Array.isArray(itemsSnapshot)
+    ? JSON.parse(JSON.stringify(itemsSnapshot))
+    : getCart();
+  const totalForOrder = cartForOrder.reduce((sum, item) => sum + (item.product.pricePkr * item.quantity), 0);
 
   const fullOrder = {
     orderNumber,
@@ -545,8 +588,8 @@ export async function placeOrder(orderData, callback) {
     phoneNumber: orderData.phoneNumber,
     deliveryAddress: orderData.deliveryAddress,
     city: orderData.city,
-    items: getCart(),
-    totalPkr: getCartTotalPkr(),
+    items: cartForOrder,
+    totalPkr: totalForOrder,
     userId: uid,
     status: "placed",
     createdAt: serverTimestamp ? serverTimestamp() : new Date(),
@@ -564,7 +607,7 @@ export async function placeOrder(orderData, callback) {
 
   if (uid && db) {
     try {
-      await setDoc(doc(db, "carts", uid), { items: [], updatedAt: serverTimestamp() });
+      await setDoc(doc(db, "carts", uid), { items: [], rev: getCartRev(), updatedAt: serverTimestamp() });
     } catch (e) {
       console.warn("Failed to clear cloud cart:", e);
     }
