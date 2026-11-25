@@ -34,18 +34,28 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Wait for the live site to respond
+      - name: Wait for the live site to settle after deploy
         # A push triggers the deploy workflow at the same time as this one,
-        # and GitHub Pages briefly returns 404 while the new version
-        # publishes. Wait (up to 10 minutes) instead of failing the tests.
+        # and real browsers keep getting GitHub Pages' 404 page for ~8
+        # minutes after the deploy reports success (curl can see 200
+        # earlier — that is the old deployment still being served). So a
+        # single 200 proves nothing: only proceed once the real page is
+        # served 3 times in a row, 30s apart.
         run: |
-          for i in $(seq 1 40); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' https://adeel1508.github.io/gharbazar-website/ || echo 000)
-            echo "attempt $i: live site -> $code"
-            if [ "$code" = "200" ]; then exit 0; fi
-            sleep 15
+          good=0
+          for i in $(seq 1 30); do
+            body=$(curl -s https://adeel1508.github.io/gharbazar-website/ || echo "")
+            if echo "$body" | grep -q "GharBazar" && ! echo "$body" | grep -q "There isn't a GitHub Pages site here"; then
+              good=$((good + 1))
+              echo "attempt $i: live site OK ($good/3)"
+              if [ "$good" -ge 3 ]; then exit 0; fi
+            else
+              good=0
+              echo "attempt $i: live site not ready yet"
+            fi
+            sleep 30
           done
-          echo "FAIL: live site did not return 200 within 10 minutes"
+          echo "FAIL: live site did not settle within 15 minutes"
           exit 1
 
       - name: Run Playwright tests (live site, read-only)
