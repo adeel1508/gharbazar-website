@@ -6,13 +6,17 @@
 // times in a row (seen in E2E runs #1, #3 and #4). So readiness must be
 // measured with the same client that will run the tests — Chromium.
 //
-// Retries every 30s for up to 15 minutes. Exits 0 when the real page is
+// Retries every 30s for up to 25 minutes. Exits 0 when the real page is
 // served twice in a row, 1 on timeout. Read-only: loads the home page
 // and reads its text, nothing else.
+//
+// The budget is 25 minutes because the post-deploy 404 window has been
+// observed to last 20+ minutes (E2E runs #6 and #7); on a healthy day
+// (schedule/manual runs, no deploy in flight) this passes in ~1 minute.
 import { chromium } from '@playwright/test';
 
 const URL = 'https://adeel1508.github.io/gharbazar-website/';
-const DEADLINE = Date.now() + 15 * 60 * 1000;
+const DEADLINE = Date.now() + 25 * 60 * 1000;
 const NOT_READY = "There isn't a GitHub Pages site here";
 
 const browser = await chromium.launch();
@@ -48,7 +52,7 @@ for (;;) {
     console.log(`attempt ${attempt}: ${String(e.message).split('\n')[0]}`);
   }
   if (Date.now() > DEADLINE) {
-    console.error('FAIL: live site did not become ready within 15 minutes');
+    console.error('FAIL: live site did not become ready within 25 minutes');
     await browser.close();
     process.exit(1);
   }
