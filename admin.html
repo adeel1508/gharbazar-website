@@ -133,6 +133,11 @@
               </div>
             </div>
             <div class="form-group" style="margin-top: 12px;">
+              <label class="form-label">Photo URLs — one per line (gallery)</label>
+              <textarea id="edit-image-uris" class="form-textarea" rows="3" placeholder="https://... (first photo = cover)&#10;https://... (second photo)"></textarea>
+              <p style="font-size: 0.8rem; color: var(--on-surface-variant); margin-top: 6px;">First photo is the cover. Leave empty to use the single Image URL above.</p>
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
               <label class="form-label">Short Spec</label>
               <input type="text" id="edit-short-spec" class="form-input" placeholder="e.g. Double Bed • Fleece • Blue">
             </div>
@@ -203,7 +208,7 @@
   </footer>
 
   <script type="module">
-    import { onAuth, logInWithEmail, logOut, adminGetProducts, adminSaveProduct, adminDeleteProduct, adminGetAllOrders, adminUpdateOrderStatus, seedProductsToFirestore, formatPkr, formatAuthError } from './js/app.js';
+    import { onAuth, logInWithEmail, logOut, adminGetProducts, adminSaveProduct, adminDeleteProduct, adminGetAllOrders, adminUpdateOrderStatus, seedProductsToFirestore, formatPkr, formatAuthError, parseImageUrls } from './js/app.js';
 
     const ADMIN_EMAIL = 'adeel.arif0786@gmail.com';
 
@@ -411,6 +416,10 @@
       document.getElementById('edit-size').value = p.size || '';
       document.getElementById('edit-image-key').value = p.imageKey || '';
       document.getElementById('edit-image-uri').value = p.imageUri || '';
+      // Gallery: existing imageUris (one per line); otherwise the single
+      // cover URL so editing never silently drops the photo.
+      const gallery = Array.isArray(p.imageUris) ? p.imageUris.filter(u => typeof u === 'string' && u.trim()) : [];
+      document.getElementById('edit-image-uris').value = gallery.length > 0 ? gallery.join('\n') : (p.imageUri || '');
       document.getElementById('edit-short-spec').value = p.shortSpec || '';
       document.getElementById('edit-desc').value = p.description || '';
       prodFormCard.style.display = 'block';
@@ -494,7 +503,11 @@
       const fabric = document.getElementById('edit-fabric').value.trim();
       const size = document.getElementById('edit-size').value.trim();
       const imageKey = document.getElementById('edit-image-key').value.trim();
-      const imageUri = document.getElementById('edit-image-uri').value.trim();
+      const imageUriSingle = document.getElementById('edit-image-uri').value.trim();
+      // Gallery wins when given: its first URL is the cover (= imageUri).
+      const photoUrls = parseImageUrls(document.getElementById('edit-image-uris').value);
+      const imageUri = photoUrls.length > 0 ? photoUrls[0] : (imageUriSingle || null);
+      const imageUris = photoUrls.length > 0 ? photoUrls : (imageUri ? [imageUri] : []);
       const shortSpec = document.getElementById('edit-short-spec').value.trim();
       const description = document.getElementById('edit-desc').value.trim();
 
@@ -508,7 +521,8 @@
         fabric,
         size,
         imageKey: imageKey || 'blanket_plain_blue',
-        imageUri: imageUri || null,
+        imageUri,
+        imageUris,
         shortSpec,
         description,
         specs: [

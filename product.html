@@ -48,10 +48,12 @@
 
   <!-- App Script -->
   <script type="module">
-    import { subscribeProducts, formatPkr, getImageSrc, addToCart, updateCartBadge, setupCartDrawer, toggleCartModal, setupHeaderAuth } from './js/app.js';
+    import { subscribeProducts, formatPkr, getImageSrc, getGalleryPhotos, addToCart, updateCartBadge, setupCartDrawer, toggleCartModal, setupHeaderAuth } from './js/app.js';
 
     let currentProduct = null;
     let selectedQuantity = 1;
+    let galleryPhotos = [];
+    let galleryIndex = 0;
 
     document.addEventListener('DOMContentLoaded', () => {
       updateCartBadge();
@@ -97,6 +99,9 @@
 
     function renderProductDetail(p) {
       const container = document.getElementById('product-detail-container');
+      const photos = getGalleryPhotos(p);
+      galleryPhotos = photos;
+      galleryIndex = 0;
       const specs = p.specs || [
         { label: "Category", value: categoryLabel(p.category) },
         { label: "Size / Cutting", value: p.size },
@@ -104,8 +109,16 @@
       ];
 
       container.innerHTML = `
-        <div class="detail-img-wrap">
-          <img src="${getImageSrc(p)}" alt="${p.name}" class="detail-img">
+        <div>
+          <div class="detail-img-wrap" id="gallery-wrap">
+            <img src="${photos[0]}" alt="${p.name}" class="detail-img" id="gallery-main-img">
+          </div>
+          ${photos.length > 1 ? `
+          <div class="gallery-thumbs" id="gallery-thumbs">
+            ${photos.map((src, i) => `
+              <img src="${src}" alt="${p.name} photo ${i + 1}" class="gallery-thumb${i === 0 ? ' active' : ''}" data-index="${i}" onclick="window.gbSelectPhoto(${i})">
+            `).join('')}
+          </div>` : ''}
         </div>
         <div class="detail-content">
           <span style="font-size: 0.85rem; font-weight: 700; color: var(--secondary); text-transform: uppercase; letter-spacing: 0.5px;">
@@ -143,6 +156,31 @@
           </div>
         </div>
       `;
+      setupGallerySwipe();
+    }
+
+    // Gallery: thumbnail click or horizontal swipe switches the main photo.
+    window.gbSelectPhoto = (i) => {
+      if (!galleryPhotos.length) return;
+      galleryIndex = ((i % galleryPhotos.length) + galleryPhotos.length) % galleryPhotos.length;
+      const main = document.getElementById('gallery-main-img');
+      if (main) main.src = galleryPhotos[galleryIndex];
+      document.querySelectorAll('.gallery-thumb').forEach((t, idx) => {
+        t.classList.toggle('active', idx === galleryIndex);
+      });
+    };
+
+    function setupGallerySwipe() {
+      const wrap = document.getElementById('gallery-wrap');
+      if (!wrap || galleryPhotos.length < 2) return;
+      let startX = null;
+      wrap.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+      wrap.addEventListener('touchend', (e) => {
+        if (startX === null) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        startX = null;
+        if (Math.abs(dx) > 40) window.gbSelectPhoto(galleryIndex + (dx < 0 ? 1 : -1));
+      }, { passive: true });
     }
 
     window.gbChangeQty = (delta) => {

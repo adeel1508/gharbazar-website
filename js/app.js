@@ -407,6 +407,36 @@ export function getImageSrc(product) {
   return map[product.imageKey] || 'images/img_blanket_plain_blue_1795368928571.jpg';
 }
 
+// Gallery photos for a product, in display order. Contract (shared with the
+// Android app): Firestore field `imageUris` is an array of URL strings and
+// its first entry is the cover (= imageUri). Fallback chain: imageUris ->
+// [imageUri] -> local drawable via imageKey (getImageSrc).
+export function getGalleryPhotos(product) {
+  if (Array.isArray(product.imageUris)) {
+    const urls = product.imageUris
+      .filter(u => typeof u === 'string' && u.trim())
+      .map(u => u.trim());
+    if (urls.length > 0) return urls;
+  }
+  if (product.imageUri) return [product.imageUri];
+  return [getImageSrc(product)];
+}
+
+// "One URL per line" textarea -> clean, deduped URL list (same rule as the
+// Android app's parseImageUrls helper).
+export function parseImageUrls(text) {
+  const seen = new Set();
+  const out = [];
+  for (const line of String(text || '').split('\n')) {
+    const url = line.trim();
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      out.push(url);
+    }
+  }
+  return out;
+}
+
 export function getCart() {
   try {
     return JSON.parse(localStorage.getItem('gharbazar_cart')) || [];
@@ -551,6 +581,7 @@ export function subscribeProducts(onProductsLoaded) {
             description: data.description || "",
             imageKey: data.imageKey || "blanket_plain_blue",
             imageUri: data.imageUri || null,
+            imageUris: Array.isArray(data.imageUris) ? data.imageUris.filter(u => typeof u === 'string' && u.trim()).map(u => u.trim()) : [],
             inStock: data.inStock !== false,
             stockQuantity: Number(data.stockQuantity) || 20
           });
@@ -648,6 +679,7 @@ export async function adminGetProducts() {
         description: data.description || "",
         imageKey: data.imageKey || "blanket_plain_blue",
         imageUri: data.imageUri || null,
+        imageUris: Array.isArray(data.imageUris) ? data.imageUris.filter(u => typeof u === 'string' && u.trim()).map(u => u.trim()) : [],
         inStock: data.inStock !== false,
         stockQuantity: Number(data.stockQuantity) || 20
       });
@@ -662,6 +694,13 @@ export async function adminGetProducts() {
 export async function adminSaveProduct(product) {
   if (!db) throw new Error("Firestore unconfigured");
   const prodId = product.id || ("prod_" + Date.now());
+  // Gallery contract: imageUris[0] is the cover and equals imageUri.
+  const gallery = [];
+  for (const u of (Array.isArray(product.imageUris) ? product.imageUris : [])) {
+    if (typeof u === 'string' && u.trim() && !gallery.includes(u.trim())) gallery.push(u.trim());
+  }
+  const cover = gallery.length > 0 ? gallery[0] : (product.imageUri || null);
+  const imageUris = gallery.length > 0 ? gallery : (cover ? [cover] : []);
   const prodData = {
     name: product.name,
     pricePkr: Number(product.pricePkr),
@@ -672,7 +711,8 @@ export async function adminSaveProduct(product) {
     specs: product.specs || [],
     description: product.description || "",
     imageKey: product.imageKey || "blanket_plain_blue",
-    imageUri: product.imageUri || null,
+    imageUri: cover,
+    imageUris,
     inStock: product.inStock !== false,
     stockQuantity: Number(product.stockQuantity) || 20,
     updatedAt: serverTimestamp()

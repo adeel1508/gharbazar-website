@@ -451,6 +451,32 @@ main {
   object-fit: cover;
 }
 
+/* Product gallery (detail page): thumbnails under the main photo. */
+.gallery-thumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.gallery-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--outline-variant);
+  cursor: pointer;
+  background: var(--surface-container);
+}
+
+.gallery-thumb.active {
+  border-color: var(--primary);
+}
+
+.detail-img-wrap {
+  touch-action: pan-y;
+}
+
 .detail-content {
   display: flex;
   flex-direction: column;
