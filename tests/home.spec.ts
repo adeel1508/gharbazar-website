@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openHome } from './helpers';
 
 // The 7 products the store must always show, with their exact prices.
 // (Counts use "at least" so a temporary extra test product, or a future
@@ -15,14 +16,6 @@ const EXPECTED_PRODUCTS = [
   { name: "Men's Unstitched Wool Plain Suit", price: 'Rs 2,299' },
   { name: "Men's Unstitched Wash And Wear Plain Suit", price: 'Rs 2,999' },
 ] as const;
-
-async function openHome(page) {
-  await page.goto('/');
-  // Products load live from Firestore — wait for the grid to fill.
-  await expect(page.locator('.product-card').first()).toBeVisible({
-    timeout: 60_000,
-  });
-}
 
 test('home page shows all 7 products with exact prices', async ({ page }) => {
   await openHome(page);

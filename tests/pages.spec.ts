@@ -1,13 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { openHome } from './helpers';
 
 // All of these are read-only page-load checks. No login is attempted,
 // no form is submitted, no order is placed.
 
 test('product detail page loads with name and price', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('.product-card').first()).toBeVisible({
-    timeout: 60_000,
-  });
+  await openHome(page);
 
   // Open the first product's Details page.
   await page.locator('.product-card').first().locator('a', { hasText: 'Details' }).click();
