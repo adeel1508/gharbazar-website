@@ -82,6 +82,9 @@
           <button id="btn-new-product" class="btn-primary">+ Add New Product</button>
         </div>
 
+        <!-- In-page status line for product actions (e.g. delete result) -->
+        <p id="admin-products-status" style="display: none; margin-bottom: 16px; padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;"></p>
+
         <!-- Product Edit Form Modal / Card -->
         <div id="product-form-card" class="card" style="display: none; margin-bottom: 24px; border: 2px solid var(--primary);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -161,6 +164,20 @@
               <!-- Products injected here -->
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Delete confirmation modal (in-page, NOT native confirm():
+           native dialogs are auto-dismissed by headless/automated
+           browsers, which made Delete silently do nothing). -->
+      <div id="delete-confirm-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div class="card" style="max-width: 420px; width: calc(100% - 32px); padding: 24px;">
+          <h3 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 8px;">Delete product?</h3>
+          <p style="font-size: 0.95rem; color: var(--on-surface-variant); margin-bottom: 20px;">Are you sure you want to delete <strong id="delete-confirm-name"></strong> (<code id="delete-confirm-id" style="font-size: 0.85rem;"></code>)? This cannot be undone.</p>
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button type="button" id="delete-confirm-cancel" class="btn-secondary" style="padding: 10px 20px;">Cancel</button>
+            <button type="button" id="delete-confirm-yes" class="btn-primary" style="padding: 10px 20px; background: var(--error); border-color: var(--error);">Delete</button>
+          </div>
         </div>
       </div>
 
@@ -400,17 +417,59 @@
       prodFormCard.scrollIntoView({ behavior: 'smooth' });
     };
 
-    window.deleteProduct = async (id) => {
-      if (confirm("Are you sure you want to delete product '" + id + "'?")) {
-        try {
-          await adminDeleteProduct(id);
-          alert("Product deleted.");
-          loadAdminData();
-        } catch (err) {
-          alert("Failed to delete: " + err.message);
-        }
-      }
+    // Delete flow uses the in-page confirmation modal above instead of
+    // the native confirm()/alert() dialogs: native dialogs are
+    // auto-dismissed (returning false) by headless/automated browsers,
+    // so clicking Delete silently did nothing — no dialog, no error,
+    // no delete — while Add/Edit (no confirm) worked fine.
+    let pendingDeleteId = null;
+
+    function showDeleteStatus(message, isError) {
+      const el = document.getElementById('admin-products-status');
+      el.style.display = 'block';
+      el.style.background = isError ? '#FCE8E6' : '#E6F4EA';
+      el.style.color = isError ? 'var(--error)' : 'var(--success)';
+      el.textContent = message;
+    }
+
+    function closeDeleteModal() {
+      pendingDeleteId = null;
+      document.getElementById('delete-confirm-modal').style.display = 'none';
+    }
+
+    window.deleteProduct = (id) => {
+      const p = allAdminProducts.find(item => item.id === id);
+      pendingDeleteId = id;
+      document.getElementById('delete-confirm-name').textContent = p ? p.name : id;
+      document.getElementById('delete-confirm-id').textContent = id;
+      document.getElementById('delete-confirm-modal').style.display = 'flex';
     };
+
+    document.getElementById('delete-confirm-cancel').addEventListener('click', closeDeleteModal);
+
+    document.getElementById('delete-confirm-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'delete-confirm-modal') closeDeleteModal();
+    });
+
+    document.getElementById('delete-confirm-yes').addEventListener('click', async () => {
+      const id = pendingDeleteId;
+      if (!id) return;
+      const yesBtn = document.getElementById('delete-confirm-yes');
+      yesBtn.disabled = true;
+      yesBtn.textContent = 'Deleting…';
+      try {
+        await adminDeleteProduct(id);
+        closeDeleteModal();
+        showDeleteStatus('Product deleted.', false);
+        loadAdminData();
+      } catch (err) {
+        closeDeleteModal();
+        showDeleteStatus('Failed to delete: ' + err.message, true);
+      } finally {
+        yesBtn.disabled = false;
+        yesBtn.textContent = 'Delete';
+      }
+    });
 
     // Show the free-text field only when "Other (custom)" is picked.
     document.getElementById('edit-category').addEventListener('change', (e) => {
