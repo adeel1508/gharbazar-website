@@ -34,6 +34,20 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Wait for the live site to respond
+        # A push triggers the deploy workflow at the same time as this one,
+        # and GitHub Pages briefly returns 404 while the new version
+        # publishes. Wait (up to 10 minutes) instead of failing the tests.
+        run: |
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://adeel1508.github.io/gharbazar-website/ || echo 000)
+            echo "attempt $i: live site -> $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 15
+          done
+          echo "FAIL: live site did not return 200 within 10 minutes"
+          exit 1
+
       - name: Run Playwright tests (live site, read-only)
         run: npx playwright test
 

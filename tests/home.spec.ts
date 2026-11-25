@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-// The 8 products the store must always show, with their exact prices.
+// The 7 products the store must always show, with their exact prices.
 // (Counts use "at least" so a temporary extra test product, or a future
 // real product, does not break these checks.)
+// NOTE: the catalogue used to have 8 products. The owner deleted
+// "Men's Unstitched Cotton Plain Suit" (Rs 3,099) himself on 2026-11-25
+// and said NOT to re-add it — so 7 is the correct count now.
 const EXPECTED_PRODUCTS = [
   { name: 'Cozy Fleece Printed Double Bed Blanket', price: 'Rs 1,949' },
   { name: 'Fleece Printed Double Bed Blanket Navy White', price: 'Rs 1,949' },
@@ -11,7 +14,6 @@ const EXPECTED_PRODUCTS = [
   { name: "Men's Unstitched Boski Plain Suit", price: 'Rs 1,999' },
   { name: "Men's Unstitched Wool Plain Suit", price: 'Rs 2,299' },
   { name: "Men's Unstitched Wash And Wear Plain Suit", price: 'Rs 2,999' },
-  { name: "Men's Unstitched Cotton Plain Suit", price: 'Rs 3,099' },
 ] as const;
 
 async function openHome(page) {
@@ -22,12 +24,12 @@ async function openHome(page) {
   });
 }
 
-test('home page shows all 8 products with exact prices', async ({ page }) => {
+test('home page shows all 7 products with exact prices', async ({ page }) => {
   await openHome(page);
 
-  // At least the 8 real products (a temporary extra test product, or a
+  // At least the 7 real products (a temporary extra test product, or a
   // future real product, must not break this check).
-  expect(await page.locator('.product-card').count()).toBeGreaterThanOrEqual(8);
+  expect(await page.locator('.product-card').count()).toBeGreaterThanOrEqual(7);
 
   for (const product of EXPECTED_PRODUCTS) {
     const card = page.locator('.product-card', { hasText: product.name });
@@ -50,7 +52,7 @@ test('search box filters products', async ({ page }) => {
 
   // Clearing the search brings the full catalogue back.
   await page.locator('#search-input').fill('');
-  expect(await page.locator('.product-card').count()).toBeGreaterThanOrEqual(8);
+  expect(await page.locator('.product-card').count()).toBeGreaterThanOrEqual(7);
 });
 
 test('category filter chips work', async ({ page }) => {
@@ -70,8 +72,8 @@ test('category filter chips work', async ({ page }) => {
   ).toHaveCount(0);
   expect(
     await page.locator('.product-card', { hasText: 'Suit' }).count(),
-  ).toBeGreaterThanOrEqual(4);
+  ).toBeGreaterThanOrEqual(3);
 
   await page.locator('.filter-btn[data-category="ALL"]').click();
-  expect(await page.locator('.product-card').count()).toBeGreaterThanOrEqual(8);
+  expect(await page.locator('.product-card').count()).toBeGreaterThanOrEqual(7);
 });
