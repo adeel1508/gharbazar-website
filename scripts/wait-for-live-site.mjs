@@ -23,7 +23,14 @@ let good = 0;
 for (;;) {
   attempt++;
   try {
-    await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // Fresh cache-busting URL every attempt: a 404 served during the
+    // deploy window must not poison the next attempt via a cached entry
+    // (E2E run #6: same-URL reloads kept returning the 404 page for
+    // 20 minutes across two fresh browser contexts).
+    await page.goto(URL + '?cb=' + Date.now(), {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
     const body = (await page.textContent('body')) || '';
     if (body.includes('GharBazar') && !body.includes(NOT_READY)) {
       good++;
