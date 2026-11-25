@@ -1,22 +1,24 @@
 // Wait until the live site serves the real home page in a REAL browser.
 //
-// curl is NOT enough: after a push, GitHub Pages keeps serving its 404
-// page ("There isn't a GitHub Pages site here.") to browsers for ~8
-// minutes, even while curl already gets 200 with the real page three
-// times in a row (seen in E2E runs #1, #3 and #4). So readiness must be
-// measured with the same client that will run the tests — Chromium.
+// curl is NOT enough: during a deploy, GitHub Pages can briefly serve
+// its 404 page ("There isn't a GitHub Pages site here.") to browsers
+// even while curl already gets 200 with the real page. So readiness must
+// be measured with the same client that will run the tests — Chromium.
 //
-// Retries every 30s for up to 25 minutes. Exits 0 when the real page is
+// Retries every 30s for up to 15 minutes. Exits 0 when the real page is
 // served twice in a row, 1 on timeout. Read-only: loads the home page
 // and reads its text, nothing else.
 //
-// The budget is 25 minutes because the post-deploy 404 window has been
-// observed to last 20+ minutes (E2E runs #6 and #7); on a healthy day
-// (schedule/manual runs, no deploy in flight) this passes in ~1 minute.
+// NOTE: the 20-minute 404s in E2E runs #6–#8 were NOT a deploy window —
+// they were a wrong URL in the tests (page.goto('/') escapes the baseURL
+// subpath to the account's Pages root, which has no site). That is fixed
+// in tests/helpers.ts; this script always used the full URL and was
+// never the problem. Each attempt still uses a fresh cache-busting URL
+// so a stale cached copy can never mask a fresh load.
 import { chromium } from '@playwright/test';
 
 const URL = 'https://adeel1508.github.io/gharbazar-website/';
-const DEADLINE = Date.now() + 25 * 60 * 1000;
+const DEADLINE = Date.now() + 15 * 60 * 1000;
 const NOT_READY = "There isn't a GitHub Pages site here";
 
 const browser = await chromium.launch();
@@ -27,10 +29,8 @@ let good = 0;
 for (;;) {
   attempt++;
   try {
-    // Fresh cache-busting URL every attempt: a 404 served during the
-    // deploy window must not poison the next attempt via a cached entry
-    // (E2E run #6: same-URL reloads kept returning the 404 page for
-    // 20 minutes across two fresh browser contexts).
+    // Fresh cache-busting URL every attempt so a stale cached copy can
+    // never mask a fresh load.
     await page.goto(URL + '?cb=' + Date.now(), {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
@@ -52,7 +52,7 @@ for (;;) {
     console.log(`attempt ${attempt}: ${String(e.message).split('\n')[0]}`);
   }
   if (Date.now() > DEADLINE) {
-    console.error('FAIL: live site did not become ready within 25 minutes');
+    console.error('FAIL: live site did not become ready within 15 minutes');
     await browser.close();
     process.exit(1);
   }

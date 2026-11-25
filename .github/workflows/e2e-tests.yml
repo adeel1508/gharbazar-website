@@ -2,19 +2,8 @@ name: E2E tests (Playwright)
 
 # Read-only tests against the LIVE site: no logins, no orders,
 # no product changes, no Firestore writes.
-#
-# NOTE: there is deliberately NO `push` trigger here. A push also starts
-# the deploy workflow, and an E2E job starting in the same minute races
-# the deploy activation: in runs #6 and #7 the test browser got the
-# GitHub Pages 404 page for 20 minutes straight (two fresh contexts,
-# cache-busting URLs, 10-minute waits each) while the site was live the
-# whole time for other browsers. No in-test waiting can fix a browser
-# process stuck on a stale edge, so E2E runs only AFTER the deploy
-# workflow has completed (workflow_run), plus the daily schedule check.
 on:
-  workflow_run:
-    workflows: ["Deploy GharBazar to GitHub Pages"]
-    types: [completed]
+  push:
     branches: [main]
   pull_request:
     branches: [main]
@@ -46,11 +35,10 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Wait for the live site in a real browser
-        # curl is NOT enough: after a deploy, GitHub Pages keeps serving
-        # its 404 page to browsers for 8-20+ minutes even while curl
-        # already gets 200 with the real page (seen in E2E runs #1, #3,
-        # #4, #6, #7). Readiness must be measured with the same client
-        # that runs the tests.
+        # curl is NOT enough: during a deploy, GitHub Pages can briefly
+        # serve its 404 page to browsers even while curl already gets
+        # 200 with the real page. Readiness must be measured with the
+        # same client that runs the tests.
         run: node scripts/wait-for-live-site.mjs
 
       - name: Run Playwright tests (live site, read-only)

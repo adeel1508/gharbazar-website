@@ -3,26 +3,24 @@ import { expect, test, type Page } from '@playwright/test';
 // Open the home page, waiting in THIS browser until the real storefront
 // appears.
 //
-// GitHub Pages serves its 404 page ("There isn't a GitHub Pages site
-// here.") to browsers for minutes after a deploy — and which edge a
-// browser lands on varies, so a readiness check in another browser (or
-// curl) proves nothing: in E2E run #5 the wait script's browser saw the
-// real page twice, yet the test browser still got the 404 page for the
-// next ~8 minutes.
-//
-// Run #6 showed the deeper problem: the test browser got the 404 page
-// for 20 minutes straight, across TWO fresh browser contexts (the first
-// attempt and its retry each burned the full 10-minute loop), while the
-// wait browser had seen the real page seconds earlier. Same-URL reloads
-// keep hitting the same poisoned cache entry. So EVERY attempt navigates
-// to a fresh cache-busting URL (?cb=<timestamp>): a 404 on one attempt
-// can never poison the next one, and the loop breaks through as soon as
-// the deployment is actually live on that edge.
+// URL TRAP — read this before changing the goto below: the baseURL is
+// https://adeel1508.github.io/gharbazar-website/ (a SUBPATH). A leading
+// slash escapes that subpath: page.goto('/') resolves to
+// https://adeel1508.github.io/ — the account's Pages root, which has no
+// site, so GitHub serves its 404 page ("There isn't a GitHub Pages site
+// here.") FOREVER. That was the bug in runs #1–#8: every home test
+// failed on the 404 page while the auth/admin/checkout tests (relative
+// URLs: 'auth.html', ...) passed every time, and the failures were
+// misread as a deploy/edge problem. The fix is a RELATIVE URL:
+// 'index.html?cb=<timestamp>' stays under the baseURL subpath. The
+// cache-busting query is kept so a stale cached copy can never mask a
+// fresh load. If the site is briefly mid-deploy, the loop below retries
+// every 30s for up to 10 minutes.
 export async function openHome(page: Page) {
   test.setTimeout(12 * 60 * 1000);
   const deadline = Date.now() + 10 * 60 * 1000;
   for (;;) {
-    await page.goto('/?cb=' + Date.now());
+    await page.goto('index.html?cb=' + Date.now());
     const body = (await page.textContent('body')) || '';
     if (
       body.includes('GharBazar') &&
