@@ -1,0 +1,1 @@
+{"description":"Read-only Playwright E2E tests for the live GharBazar website (no logins, no orders, no writes).","devDependencies":{"@playwright/test":"^1.65.1"},"name":"gharbazar-website-e2e","private":true,"scripts":{"test":"playwright test","test:report":"playwright show-report"},"version":"1.0.0"}
