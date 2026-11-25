@@ -2,14 +2,13 @@ name: E2E tests (Playwright)
 
 # Read-only tests against the LIVE site: no logins, no orders,
 # no product changes, no Firestore writes.
+# Runs ONLY when Adeel asks (manual dispatch) or on push/PR.
+# Daily schedule removed 2026-11-26 per Adeel — no automatic daily runs.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  schedule:
-    # Daily live-site check (~11:00 PKT)
-    - cron: "0 6 * * *"
   workflow_dispatch:
 
 permissions:
