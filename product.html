@@ -181,6 +181,18 @@
         startX = null;
         if (Math.abs(dx) > 40) window.gbSelectPhoto(galleryIndex + (dx < 0 ? 1 : -1));
       }, { passive: true });
+      // Mouse drag (desktop): same 40px swipe as touch. Mouse events never
+      // fire from touch input, so these cannot double-fire with the above.
+      let mouseDown = false;
+      wrap.addEventListener('mousedown', (e) => { mouseDown = true; startX = e.clientX; e.preventDefault(); });
+      wrap.addEventListener('mouseup', (e) => {
+        if (!mouseDown || startX === null) return;
+        mouseDown = false;
+        const dx = e.clientX - startX;
+        startX = null;
+        if (Math.abs(dx) > 40) window.gbSelectPhoto(galleryIndex + (dx < 0 ? 1 : -1));
+      });
+      wrap.addEventListener('mouseleave', () => { mouseDown = false; startX = null; });
     }
 
     window.gbChangeQty = (delta) => {
