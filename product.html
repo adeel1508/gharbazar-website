@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Product Details - GharBazar</title>
+  <meta name="description" content="View product details, price and photos at GharBazar — premium winter blankets and men's suits with Cash on Delivery across Pakistan.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -98,6 +99,17 @@
     }
 
     function renderProductDetail(p) {
+      // SEO: unique title + meta description per product (page title was
+      // the same generic "Product Details - GharBazar" for every product).
+      document.title = `${p.name} - GharBazar`;
+      const seoDesc = (p.description || p.shortSpec || `${p.name} - GharBazar`).replace(/\s+/g, ' ').trim().slice(0, 155);
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement('meta');
+        metaDesc.setAttribute('name', 'description');
+        document.head.appendChild(metaDesc);
+      }
+      metaDesc.setAttribute('content', seoDesc);
       const container = document.getElementById('product-detail-container');
       const photos = getGalleryPhotos(p);
       galleryPhotos = photos;
