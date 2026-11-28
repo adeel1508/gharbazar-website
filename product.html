@@ -7,6 +7,9 @@
   <meta name="description" content="View product details, price and photos at GharBazar — premium winter blankets and men's suits with Cash on Delivery across Pakistan.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -128,7 +131,7 @@
           ${photos.length > 1 ? `
           <div class="gallery-thumbs" id="gallery-thumbs">
             ${photos.map((src, i) => `
-              <img src="${src}" alt="${p.name} photo ${i + 1}" class="gallery-thumb${i === 0 ? ' active' : ''}" data-index="${i}" onclick="window.gbSelectPhoto(${i})">
+              <img src="${src}" alt="${p.name} photo ${i + 1}" class="gallery-thumb${i === 0 ? ' active' : ''}" data-index="${i}" loading="lazy" onclick="window.gbSelectPhoto(${i})">
             `).join('')}
           </div>` : ''}
         </div>
