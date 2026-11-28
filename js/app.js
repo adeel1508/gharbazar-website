@@ -395,8 +395,8 @@ export function formatPkr(amount) {
 // Cloudinary-hosted photos are stored at full size (1080px), but cards show
 // them at ~300px and the detail gallery at ~600px. Serve resized, auto-format
 // versions instead: roughly half the bytes at the same visible quality, so
-// the page loads noticeably faster on mobile data. Local images (images/...)
-// and already-transformed URLs pass through untouched.
+// the page loads noticeably faster on mobile data. Local files and
+// already-transformed URLs pass through untouched.
 export function cloudinaryThumb(url, width) {
   if (typeof url !== 'string' || !url.includes('res.cloudinary.com')) return url;
   if (url.includes('/image/upload/w_')) return url;
