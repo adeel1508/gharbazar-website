@@ -392,8 +392,19 @@ export function formatPkr(amount) {
   return "Rs " + Number(amount).toLocaleString('en-US');
 }
 
+// Cloudinary-hosted photos are stored at full size (1080px), but cards show
+// them at ~300px and the detail gallery at ~600px. Serve resized, auto-format
+// versions instead: roughly half the bytes at the same visible quality, so
+// the page loads noticeably faster on mobile data. Local images (images/...)
+// and already-transformed URLs pass through untouched.
+export function cloudinaryThumb(url, width) {
+  if (typeof url !== 'string' || !url.includes('res.cloudinary.com')) return url;
+  if (url.includes('/image/upload/w_')) return url;
+  return url.replace('/image/upload/', `/image/upload/w_${width},q_auto,f_auto/`);
+}
+
 export function getImageSrc(product) {
-  if (product.imageUri) return product.imageUri;
+  if (product.imageUri) return cloudinaryThumb(product.imageUri, 640);
   const map = {
     'blanket_printed_black': 'images/img_blanket_printed_black_1795368929423.jpg',
     'blanket_navy_white': 'images/img_blanket_navy_white_1795368929031.jpg',
@@ -415,10 +426,10 @@ export function getGalleryPhotos(product) {
   if (Array.isArray(product.imageUris)) {
     const urls = product.imageUris
       .filter(u => typeof u === 'string' && u.trim())
-      .map(u => u.trim());
+      .map(u => cloudinaryThumb(u.trim(), 1000));
     if (urls.length > 0) return urls;
   }
-  if (product.imageUri) return [product.imageUri];
+  if (product.imageUri) return [cloudinaryThumb(product.imageUri, 1000)];
   return [getImageSrc(product)];
 }
 
